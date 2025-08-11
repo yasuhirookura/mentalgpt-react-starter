@@ -1,0 +1,25 @@
+.container {
+  max-width: 500px;
+  margin: 40px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+}
+textarea {
+  width: 400px; /* またはお好みの幅、例: 80%など */
+  max-width: 100%;
+  /*
+  width: 100%;
+  height: 100px;
+  margin-bottom: 10px;
+  */
+}
+button {
+  padding: 10px 20px;
+}
+.response {
+  margin-top: 15px;
+  background: #eef;
+  padding: 10px;
+  border-radius: 5px;
+}
