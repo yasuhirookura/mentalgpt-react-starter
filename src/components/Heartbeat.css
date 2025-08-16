@@ -1,0 +1,39 @@
+/* src/components/Heartbeat.css */
+:root {
+  --mgpt-heart-color: #6ecff6; /* 水色 */
+  --mgpt-heart-speed: 1.05s;
+}
+
+.mgpt-heart-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mgpt-heart {
+  color: var(--mgpt-heart-color);
+  transform-origin: center;
+  animation: mgpt-heartbeat var(--mgpt-heart-speed) ease-in-out infinite;
+  animation-play-state: paused; /* デフォルト静止（回答後は止めて残す） */
+}
+.mgpt-heart.is-active { animation-play-state: running; }
+.mgpt-heart.is-paused { animation-play-state: paused; }
+
+.mgpt-heart-text {
+  font-size: 12px;
+  color: #64748b;
+}
+
+@keyframes mgpt-heartbeat {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(0.9); }
+  40%  { transform: scale(1); }
+  60%  { transform: scale(1.1); }
+  80%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+/* OSの「動きを減らす」に配慮 */
+@media (prefers-reduced-motion: reduce) {
+  .mgpt-heart { animation: none !important; }
+}
