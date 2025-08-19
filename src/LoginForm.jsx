@@ -6,122 +6,172 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  sendPasswordResetEmail,
+  sendEmailVerification,
 } from "firebase/auth";
 import "./auth.css";
 
 export default function LoginForm() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  // すべて useState(...) の戻り値（配列）を分割代入しています
+  const [mode, setMode] = useState("login"); // 'login' | 'signup'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const resetMsg = () => setMsg("");
+
+  const handleGoogle = async () => {
+    resetMsg();
+    setLoading(true);
     try {
-      if (mode === "login") {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        // ここでパスワード簡易バリデーション（必要に応じて強化）
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      setMsg(e.message || "Googleログインに失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    resetMsg();
+
+    if (!email || !password) {
+      setMsg("メールとパスワードを入力してください。");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (mode === "signup") {
         if (password.length < 8) {
-          alert("パスワードは8文字以上にしてください。");
+          setMsg("パスワードは8文字以上にしてください。");
           return;
         }
-        await createUserWithEmailAndPassword(auth, email, password);
-        // 必要なら確認メール送信: import { sendEmailVerification } して呼び出し
-        // await sendEmailVerification(auth.currentUser);
+        if (password !== password2) {
+          setMsg("確認用パスワードが一致しません。");
+          return;
+        }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        // 確認メール（運用方針：メール確認必須）
+        if (cred.user && !cred.user.emailVerified) {
+          await sendEmailVerification(cred.user);
+          setMsg("確認メールを送信しました。受信箱をご確認ください。");
+        }
+      } else {
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        if (cred.user && !cred.user.emailVerified) {
+          setMsg("メールアドレスが未確認です。確認メールを再送します。");
+          try {
+            await sendEmailVerification(cred.user);
+          } catch {/* no-op */}
+        }
       }
-    } catch (err) {
-      alert(err.message || "エラーが発生しました");
-    }
-  };
-
-  const onGoogle = async () => {
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err) {
-      alert(err.message || "Googleログインでエラーが発生しました");
-    }
-  };
-
-  const onReset = async () => {
-    if (!email) return alert("リセット用にメールアドレスを入力してください。");
-    try {
-      await sendPasswordResetEmail(auth, email);
-      alert("パスワード再設定メールを送信しました。");
-    } catch (err) {
-      alert(err.message || "送信に失敗しました");
+    } catch (e) {
+      setMsg(e.message || "処理に失敗しました。");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="auth-page">
-      <div className="auth-wrapper">
-        {/* ヘッダーコピー */}
-        <header className="auth-headline">
-          <p className="tagline">あなたの心にやさしく寄り添う</p>
-          <h1 className="brand">
-            <span className="brand-strong">MentalGPT</span>
-            <span className="brand-sub"> powered by ChatGPT</span>
-            <span className="brand-badge">β版</span>
-          </h1>
-          <p className="subcopy">より良く進化させていきます。</p>
-        </header>
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h1 className="brand">
+          <span className="muted">あなたの心にやさしく寄り添う</span>
+          <br />
+          <span className="brand-strong">MentalGPT</span>
+          <span className="muted"> powered by ChatGPT</span>
+          <span className="beta"> β版</span>
+        </h1>
 
-        {/* カード */}
-        <section className="auth-card" role="region" aria-label="ログインカード">
-          <form onSubmit={onSubmit} className="auth-form">
-            <label className="field">
-              <span>メールアドレス</span>
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </label>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label>
+            メールアドレス
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              inputMode="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              onFocus={resetMsg}
+            />
+          </label>
 
-            <label className="field">
-              <span>パスワード</span>
+          <label>
+            パスワード
+            <div className="pw-row">
               <input
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
+                type={showPw ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 placeholder="8文字以上を推奨"
+                onFocus={resetMsg}
               />
-              <small className="hint">英大小字・数字・記号を混ぜると安全です</small>
-            </label>
-
-            <button type="submit" className="btn primary">
-              {mode === "login" ? "ログイン" : "新規登録"}
-            </button>
-
-            <button type="button" className="btn ghost" onClick={onGoogle}>
-              Googleでログイン
-            </button>
-
-            <div className="aux">
-              <button type="button" className="link" onClick={onReset}>
-                パスワードをお忘れの方
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setShowPw((v) => !v)}
+              >
+                {showPw ? "隠す" : "表示"}
               </button>
-              <span className="sep">／</span>
-              {mode === "login" ? (
-                <button type="button" className="link" onClick={() => setMode("signup")}>
-                  新規登録はこちら
-                </button>
-              ) : (
-                <button type="button" className="link" onClick={() => setMode("login")}>
-                  既にアカウントをお持ちの方
-                </button>
-              )}
             </div>
-          </form>
-        </section>
+          </label>
+
+          {mode === "signup" && (
+            <label>
+              パスワード（確認）
+              <input
+                type={showPw ? "text" : "password"}
+                value={password2}
+                onChange={(e) => setPassword2(e.target.value)}
+                autoComplete="new-password"
+                placeholder="もう一度入力"
+                onFocus={resetMsg}
+              />
+            </label>
+          )}
+
+          {msg && <div className="alert">{msg}</div>}
+
+          <button type="submit" disabled={loading} className="primary">
+            {loading ? "処理中…" : mode === "signup" ? "登録する" : "ログイン"}
+          </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            className="outline"
+            onClick={handleGoogle}
+          >
+            Googleでログイン
+          </button>
+
+          <div className="switch-row">
+            {mode === "signup" ? (
+              <>
+                すでにアカウントをお持ちですか？{" "}
+                <button type="button" className="link" onClick={() => setMode("login")}>
+                  ログインへ
+                </button>
+              </>
+            ) : (
+              <>
+                はじめての方は{" "}
+                <button type="button" className="link" onClick={() => setMode("signup")}>
+                  新規登録
+                </button>
+              </>
+            )}
+          </div>
+        </form>
       </div>
-    </main>
+    </div>
   );
 }
