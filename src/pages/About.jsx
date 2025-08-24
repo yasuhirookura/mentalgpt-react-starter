@@ -18,4 +18,5 @@ function About() {
   );
 }
 
+// export は関数の外に置く
 export default About;
