@@ -1,4 +1,16 @@
-import About from "./pages/About"; // 追加
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import LandingPage from "./pages/LandingPage";
+import Pricing from "./pages/Pricing";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Legal from "./pages/Legal";
+import About from "./pages/About";      // 追加
+
+import LoginForm from "./LoginForm";
+import Dashboard from "./Dashboard";
+import SiteFooter from "./components/SiteFooter";
 
 function App() {
   return (
@@ -10,9 +22,9 @@ function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<Legal />} />
-        <Route path="/about" element={<About />} />   {/* ←これを追加 */}
+        <Route path="/about" element={<About />} />  {/* 追加 */}
 
-        {/* 認証系（既存） */}
+        {/* 認証系 */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/dashboard" element={<Dashboard />} />
 
@@ -20,8 +32,9 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* 全ページ共通フッター */}
       <SiteFooter />
     </BrowserRouter>
   );
 }
+
+export default App;   // ←これが必須！
