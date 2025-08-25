@@ -1,5 +1,4 @@
 import React from "react";
-import "./site.css";
 
 export default function Legal() {
   return (
