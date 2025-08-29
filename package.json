@@ -11,6 +11,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "prebuild": "echo '== versions on vercel ==' && node -e \"const v=p=>require(p+'/package.json').version; console.log('react',v('react'),'react-dom',v('react-dom'));\" && echo '== grep React5 / use from react ==' && (grep -Rni \"import\\s*\\*\\s*as\\s*React5\\s*from\\s*['\\\"]react['\\\"]\" src || true) && (grep -Rni \"import\\s*React5\\s*,\\s*{[^}]*use[^}]*}\\s*from\\s*['\\\"]react['\\\"]\" src || true) && (grep -Rni \"from\\s*['\\\"]react5['\\\"]\" src || true) && (grep -Rni \"import\\s*{\\s*use\\s*}\\s*from\\s*['\\\"]react['\\\"]\" src || true)",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
