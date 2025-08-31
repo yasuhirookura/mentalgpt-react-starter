@@ -1,10 +1,13 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
-export default function BackToHome({ className = "" }) {
+/** 各ページ先頭に置く「トップへ戻る」リンク */
+export default function BackToHome({ to = "/" }) {
+  const { pathname } = useLocation();
+  if (pathname === to) return null;
   return (
-    <p className={`back-to-home ${className}`}>
-      <Link to="/">← トップへ戻る</Link>
+    <p className="back-home">
+      <Link to={to}>← トップへ戻る</Link>
     </p>
   );
 }

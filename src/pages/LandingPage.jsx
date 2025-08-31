@@ -15,7 +15,8 @@ export default function LandingPage() {
           <Link to="/pricing" className="btn outline">料金を見る</Link>
         </div>
         <p className="mini-note">
-          ※本サービスは医療行為ではありません（診断・治療は行いません）。
+          ※本サービスは医療行為ではありません（診断・治療は行いません）。<br />
+          ※AI応答は OpenAI の API（ChatGPT）を利用しています。
         </p>
       </section>
 

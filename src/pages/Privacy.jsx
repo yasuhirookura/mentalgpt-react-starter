@@ -5,12 +5,8 @@ export default function Privacy() {
   return (
     <main className="legal container pad">
       <BackToHome />
-
       <h1>プライバシーポリシー</h1>
-      <p>
-        個人事業「ベースボール」（代表：大倉恭弘、以下「当オフィス」）は、
-        本サービス「MentalGPT」における個人情報の取扱いについて以下の通り定めます。
-      </p>
+      <p>個人事業「ベースボール」（代表：大倉恭弘、以下「当オフィス」）は、本サービス「MentalGPT」における個人情報の取扱いについて以下の通り定めます。</p>
 
       <h2>1. 取得する情報</h2>
       <ul>
@@ -31,8 +27,9 @@ export default function Privacy() {
 
       <h2>4. 外部サービスの利用</h2>
       <p>
-        本サービスは Firebase（認証・データ保存）、Stripe（決済）、OpenAI API を利用します。
-        クレジットカード情報は当社で保持しません。
+        本サービスは Firebase（認証・データ保存）、Stripe（決済）、OpenAI API（AI応答生成）を利用します。
+        入力されたテキストはAI応答生成のため OpenAI に送信される場合があります。
+        クレジットカード情報は当オフィスでは保持しません。
       </p>
 
       <h2>5. セキュリティ</h2>
@@ -42,10 +39,10 @@ export default function Privacy() {
       <p>ユーザーは、法令に基づき、ご自身の情報の開示等を請求できます。</p>
 
       <h2>7. お問い合わせ</h2>
-      <p>
-        本ポリシーに関するお問い合わせは{" "}
-        <a href="mailto:info@okulab.com">info@okulab.com</a> まで。
-      </p>
+      <p>本ポリシーに関するお問い合わせは <a href="mailto:info@okulab.com">info@okulab.com</a> まで。</p>
+
+      <h2>8. 入力内容の注意</h2>
+      <p>個人情報や機微な情報の入力はお控えください。入力内容はAI応答生成のために外部サービスで処理される場合があります。</p>
 
       <p className="date">制定：2025年8月31日 / 最終更新：2025年8月31日</p>
     </main>
