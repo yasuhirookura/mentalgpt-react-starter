@@ -87,27 +87,41 @@ a:hover { text-decoration: underline; }
 .legal ul { padding-left: 20px; }
 
 /* --- Footer --- */
-.site-footer { 
-  margin-top: 48px; 
-  padding: 24px 0; 
-  background: var(--bg); 
+.site-footer {
+  margin-top: 48px;
+  padding: 24px 0;
+  background: var(--bg);
 }
-.site-footer .links { 
-  display: flex; 
-  gap: 16px;           /* ← リンク間の余白 */
-  flex-wrap: wrap; 
-  font-size: 14px; 
-  line-height: 1.6;    /* ← 行間を調整 */
+
+/* ここを強化 */
+.site-footer .links {
+  display: flex;
+  gap: 16px;             /* リンク間の余白 */
+  flex-wrap: wrap;
+  line-height: 1.6;
 }
-.site-footer .org { 
-  margin-top: 8px; 
-  color: var(--muted); 
-  font-size: 13px; 
-  line-height: 1.6; 
+
+/* 万一 .links の display:flex が効かない環境でも余白が出る保険 */
+.site-footer .links a { margin-right: 16px; }
+.site-footer .links a:last-child { margin-right: 0; }
+
+/* Chrome で“左に寄って見える”対策（中央寄せにしたい場合は on） */
+.site-footer .container {
+  /* center にしたい場合は下の2行を有効化 */
+  /* text-align: center;
+  align-items: center; */
 }
-.site-footer .copy { 
-  color: var(--muted); 
-  font-size: 12px; 
-  margin-top: 10px; 
-  line-height: 1.5; 
+
+/* 組織名・コピーの読みやすさ */
+.site-footer .org {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.site-footer .copy {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 10px;
+  line-height: 1.5;
 }
