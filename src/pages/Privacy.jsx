@@ -1,10 +1,16 @@
 import React from "react";
+import BackToHome from "../components/BackToHome";
 
 export default function Privacy() {
   return (
     <main className="legal container pad">
+      <BackToHome />
+
       <h1>プライバシーポリシー</h1>
-      <p>OKULAB（以下「当社」）は、本サービス「MentalGPT」における個人情報の取扱いについて以下の通り定めます。</p>
+      <p>
+        個人事業「ベースボール」（代表：大倉恭弘、以下「当オフィス」）は、
+        本サービス「MentalGPT」における個人情報の取扱いについて以下の通り定めます。
+      </p>
 
       <h2>1. 取得する情報</h2>
       <ul>
@@ -36,9 +42,12 @@ export default function Privacy() {
       <p>ユーザーは、法令に基づき、ご自身の情報の開示等を請求できます。</p>
 
       <h2>7. お問い合わせ</h2>
-      <p>本ポリシーに関するお問い合わせは <a href="mailto:info@okulab.com">info@okulab.com</a> まで。</p>
+      <p>
+        本ポリシーに関するお問い合わせは{" "}
+        <a href="mailto:info@okulab.com">info@okulab.com</a> まで。
+      </p>
 
-      <p className="date">制定：2025年8月24日 / 最終更新：2025年8月24日</p>
+      <p className="date">制定：2025年8月31日 / 最終更新：2025年8月31日</p>
     </main>
   );
 }
