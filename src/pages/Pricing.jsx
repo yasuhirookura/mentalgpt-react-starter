@@ -1,11 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import BackToHome from "../components/BackToHome";
 
 export default function Pricing() {
   return (
     <main className="container pad">
-      <BackToHome />
       <h1>料金プラン</h1>
 
       <div className="plan-card">
@@ -31,8 +29,12 @@ export default function Pricing() {
         <Link className="btn primary" to="/login">登録してはじめる</Link>
       </div>
 
-      <p className="note">7日間の無料体験あり（期間内の解約で料金は発生しません）。</p>
-      <p className="mini-note">※本サービスは医療行為ではありません。AI応答は OpenAI の API（ChatGPT）を利用しています。</p>
+      <p className="note">
+        7日間の無料体験あり（期間内の解約で料金は発生しません）。
+      </p>
+      <p className="mini-note">
+        ※本サービスは医療行為ではありません。
+      </p>
     </main>
   );
 }
