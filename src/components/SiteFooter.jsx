@@ -1,3 +1,4 @@
+// src/components/SiteFooter.jsx
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -14,10 +15,12 @@ export default function SiteFooter() {
           <Link to="/faq">FAQ</Link>
           <Link to="/login">ログイン</Link>
         </nav>
+
         <p className="org">
           運営：ベースボール（個人事業主） /{" "}
           <a href="https://okulab.com/">Okulab</a>
         </p>
+
         <p className="copy">
           © 2025 MentalGPT / Okulab / baseball
           <br />
