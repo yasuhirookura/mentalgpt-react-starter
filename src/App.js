@@ -8,6 +8,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import About from "./pages/About";
+import Faq from "./pages/Faq";
 
 import LoginForm from "./LoginForm";
 import Dashboard from "./Dashboard";
@@ -24,6 +25,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/about" element={<About />} />
+        <Route path="/faq" element={<Faq />} />
         {/* 認証系 */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/dashboard" element={<Dashboard />} />

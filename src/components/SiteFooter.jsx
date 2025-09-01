@@ -6,14 +6,16 @@ export default function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="container">
-        <nav className="links" aria-label="フッターナビゲーション">
-          <Link to="/about">About</Link>
-          <Link to="/pricing">料金</Link>
-          <Link to="/terms">利用規約</Link>
-          <Link to="/privacy">プライバシー</Link>
-          <Link to="/legal">特定商取引法</Link>
-          <Link to="/faq">FAQ</Link>
-          <Link to="/login">ログイン</Link>
+        <nav aria-label="フッターナビゲーション">
+          <ul className="links">
+            <li><Link to="/about">About</Link></li>
+            <li><Link to="/pricing">料金</Link></li>
+            <li><Link to="/terms">利用規約</Link></li>
+            <li><Link to="/privacy">プライバシー</Link></li>
+            <li><Link to="/legal">特定商取引法</Link></li>
+            <li><Link to="/faq">FAQ</Link></li>
+            <li><Link to="/login">ログイン</Link></li>
+          </ul>
         </nav>
 
         <p className="org">
@@ -26,5 +28,4 @@ export default function SiteFooter() {
         </p>
       </div>
     </footer>
-  );
-}
+  );...
