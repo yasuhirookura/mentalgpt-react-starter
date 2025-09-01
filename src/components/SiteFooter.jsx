@@ -12,6 +12,7 @@ export default function SiteFooter() {
           <Link to="/terms">利用規約</Link>
           <Link to="/privacy">プライバシー</Link>
           <Link to="/legal">特定商取引法</Link>
+          <Link to="/faq">FAQ</Link>
           <Link to="/login">ログイン</Link>
         </nav>
 
