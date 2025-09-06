@@ -10,10 +10,10 @@ export default function LandingPage() {
           あなたの心にやさしく寄り添う、AIメンタルサポート。
         </h2>
         <p className="hero-sub">
-  対話することで気持ちが整理でき、<br className="sp-only" />
-  心がふわっと軽くなる。<br className="sp-only" />
-  メンタル相談に調整されたAIに、<br className="sp-only" />
-  24時間いつでも相談できるサービスです。
+          対話することで気持ちが整理でき、<br className="sp-only" />
+          心がふわっと軽くなる。<br />
+          メンタル相談に調整されたAIに、<br className="sp-only" />
+          24時間いつでも相談できるサービスです。
 </p>
 {/*
         <p className="hero-sub">
