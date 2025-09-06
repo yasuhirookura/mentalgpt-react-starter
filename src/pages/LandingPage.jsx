@@ -7,8 +7,9 @@ export default function LandingPage() {
       <section className="hero">
         <h1>MentalGPT</h1>
         <p className="lead">
-          あなたの心にやさしく寄り添う、AIメンタルサポート。<br />
-          いつでも、どこでも、安心して自分の気持ちを言葉に。
+          あなたの心にやさしく寄り添う、AIメンタルサポート。<br /><br />
+          対話することで気持ちが整理でき、心がふわっと軽くなる。<br />
+          メンタル相談に調整されたAIに、24時間いつでも相談できるサービスです。
         </p>
         <div className="cta-row">
           <Link to="/login" className="btn primary">今すぐはじめる</Link>
