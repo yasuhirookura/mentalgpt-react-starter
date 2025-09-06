@@ -137,3 +137,15 @@ a:hover { text-decoration: underline; }
   margin-top: 10px;
   line-height: 1.5;
 }
+
+/* PC・タブレットでは改行タグを無効化 */
+.sp-only {
+  display: none;
+}
+
+/* スマホ（幅640px以下）では改行タグを有効化 */
+@media (max-width: 640px) {
+  .sp-only {
+    display: inline;
+  }
+}
