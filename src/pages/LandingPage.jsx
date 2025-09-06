@@ -6,8 +6,10 @@ export default function LandingPage() {
     <main className="landing">
       <section className="hero">
         <h1>MentalGPT</h1>
-        <p className="lead">
-          あなたの心にやさしく寄り添う、AIメンタルサポート。<br /><br />
+        <h2 className="hero-catch">
+          あなたの心にやさしく寄り添う、AIメンタルサポート。
+        </h2>
+        <p className="hero-sub">
           対話することで気持ちが整理でき、心がふわっと軽くなる。<br />
           メンタル相談に調整されたAIに、24時間いつでも相談できるサービスです。
         </p>
