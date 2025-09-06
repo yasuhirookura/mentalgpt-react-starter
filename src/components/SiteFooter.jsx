@@ -24,6 +24,8 @@ export default function SiteFooter() {
         <p className="copy">
           © 2025 MentalGPT / Okulab / baseball
           <br />
+          ※ MentalGPT は医療・診断・治療の代替となるものではありません。<br />
+   必要に応じて専門の医師やカウンセラーへご相談ください。<br /><br />
           “ChatGPT” は OpenAI の商標です。AI応答には OpenAI の API（ChatGPT）を利用しています。
         </p>
       </div>
