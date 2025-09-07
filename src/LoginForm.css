@@ -1,0 +1,172 @@
+/* src/LoginForm.css */
+
+/* 画面中央配置（スマホは天地左右中央） */
+.auth-page {
+  min-height: 100dvh;            /* ビューポート高いっぱい */
+  display: grid;
+  place-items: center;           /* 縦横センター */
+  background: #f7f7f9;
+  padding: 24px;
+}
+
+/* コンテンツ最大幅＆余白（フッターを下げる効果も） */
+.auth-wrapper {
+  width: 100%;
+  max-width: 480px;              /* 少し広めに */
+  margin-bottom: 24px;
+}
+
+/* ───────── ヘッダーコピー ───────── */
+.auth-headline {
+  text-align: center;
+  margin-bottom: 18px;
+  color: #111;
+}
+
+.auth-headline .tagline {        /* 中：あなたの心にやさしく寄り添う */
+  font-size: clamp(16px, 2.4vw, 20px);
+  margin: 0 0 6px;
+  color: #333;
+  font-weight: 700;
+}
+
+.auth-headline .brand {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.brand-strong {                  /* 大：MentalGPT */
+  font-size: clamp(36px, 6.2vw, 48px);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.brand-sub {                     /* 小：powered by ChatGPT */
+  font-size: clamp(12px, 2.6vw, 14px);
+  font-weight: 600;
+  margin-left: 8px;
+  color: #3a3a3a;
+}
+
+.brand-badge {                   /* 中：β版（バッジ） */
+  display: inline-block;
+  margin-left: 10px;
+  font-size: clamp(13px, 2.6vw, 16px);
+  font-weight: 700;
+  color: #0a6cff;
+  background: #e8f1ff;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.auth-headline .subcopy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+}
+
+/* ───────── カード ───────── */
+.auth-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  padding: 22px;
+}
+
+/* ───────── フォーム ───────── */
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field > span {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+.field input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d7d7dc;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 15px;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #0a6cff;
+  box-shadow: 0 0 0 3px rgba(10,108,255,0.14);
+}
+
+.hint {
+  color: #8a8a92;
+  font-size: 12px;
+}
+
+/* ───────── ボタン ───────── */
+.btn {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #0a6cff;
+  color: #fff;
+}
+
+.btn.primary:hover {
+  filter: brightness(1.05);
+}
+
+.btn.ghost {
+  background: #fff;
+  border-color: #d7d7dc;
+  color: #222;
+}
+
+.btn.ghost:hover {
+  background: #f5f6f7;
+}
+
+/* 補助リンク行 */
+.aux {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: #0a6cff;
+  font-weight: 600;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+
+.link:hover { text-decoration: underline; }
+.sep { color: #b0b0b6; }
+
+/* ───────── ダークモード（任意） ───────── */
+@media (prefers-color-scheme: dark) {
+  .auth-page { background: #0f1115; }
+  .auth-headline { color: #e9e9ec; }
+  .auth-headline .tagline, .auth-headline .subcopy { color: #a6a6ad; }
+  .auth-card { background: #141821; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+  .field > span { color: #dcdce2; }
+  .field input { background: #0f131b; border-color: #2a2f3a; color: #fff; }
+  .btn.ghost { background: #0f131b; border-color: #2a2f3a; color: #e9e9ec; }
+  .hint { color: #9aa0aa; }
+}

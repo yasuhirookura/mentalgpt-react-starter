@@ -8,10 +8,11 @@ import {
   signInWithPopup,
   sendEmailVerification,
 } from "firebase/auth";
-import "./auth.css";
+
+// 旧 auth.css を LoginForm.css にリネームして読み込む
+import "./LoginForm.css";
 
 export default function LoginForm() {
-  // すべて useState(...) の戻り値（配列）を分割代入しています
   const [mode, setMode] = useState("login"); // 'login' | 'signup'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,7 +58,7 @@ export default function LoginForm() {
           return;
         }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        // 確認メール（運用方針：メール確認必須）
+        // 確認メール送付（メール確認必須の運用）
         if (cred.user && !cred.user.emailVerified) {
           await sendEmailVerification(cred.user);
           setMsg("確認メールを送信しました。受信箱をご確認ください。");
@@ -79,98 +80,122 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <h1 className="brand">
-          <span className="muted">あなたの心にやさしく寄り添う</span>
-          <br />
-          <span className="brand-strong">MentalGPT</span>
-          <span className="muted"> powered by ChatGPT</span>
-          <span className="beta"> β版</span>
-        </h1>
+    <div className="auth-page">
+      <div className="auth-wrapper">
+        {/* ヘッダー（サイズ：中／大／小／中） */}
+        <div className="auth-headline">
+          <p className="tagline">あなたの心にやさしく寄り添う</p>
+          <h1 className="brand">
+            <span className="brand-strong">MentalGPT</span>
+            <span className="brand-sub"> powered by ChatGPT</span>
+            <span className="brand-badge">β版</span>
+          </h1>
+        </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <label>
-            メールアドレス
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              inputMode="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              onFocus={resetMsg}
-            />
-          </label>
-
-          <label>
-            パスワード
-            <div className="pw-row">
+        {/* カード（フォーム） */}
+        <div className="auth-card">
+          <form onSubmit={handleSubmit} className="auth-form" noValidate>
+            <label className="field">
+              <span>メールアドレス</span>
               <input
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                placeholder="8文字以上を推奨"
-                onFocus={resetMsg}
-              />
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setShowPw((v) => !v)}
-              >
-                {showPw ? "隠す" : "表示"}
-              </button>
-            </div>
-          </label>
-
-          {mode === "signup" && (
-            <label>
-              パスワード（確認）
-              <input
-                type={showPw ? "text" : "password"}
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-                autoComplete="new-password"
-                placeholder="もう一度入力"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
                 onFocus={resetMsg}
               />
             </label>
-          )}
 
-          {msg && <div className="alert">{msg}</div>}
-
-          <button type="submit" disabled={loading} className="primary">
-            {loading ? "処理中…" : mode === "signup" ? "登録する" : "ログイン"}
-          </button>
-
-          <button
-            type="button"
-            disabled={loading}
-            className="outline"
-            onClick={handleGoogle}
-          >
-            Googleでログイン
-          </button>
-
-          <div className="switch-row">
-            {mode === "signup" ? (
-              <>
-                すでにアカウントをお持ちですか？{" "}
-                <button type="button" className="link" onClick={() => setMode("login")}>
-                  ログインへ
+            <label className="field">
+              <span>パスワード</span>
+              <div className="pw-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  placeholder="8文字以上を推奨"
+                  onFocus={resetMsg}
+                />
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => setShowPw((v) => !v)}
+                >
+                  {showPw ? "隠す" : "表示"}
                 </button>
-              </>
-            ) : (
-              <>
-                はじめての方は{" "}
-                <button type="button" className="link" onClick={() => setMode("signup")}>
-                  新規登録
-                </button>
-              </>
+              </div>
+              <span className="hint">{mode === "signup" ? "新規登録時は8文字以上を推奨" : "\u00A0"}</span>
+            </label>
+
+            {mode === "signup" && (
+              <label className="field">
+                <span>パスワード（確認）</span>
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="もう一度入力"
+                  onFocus={resetMsg}
+                />
+              </label>
             )}
-          </div>
-        </form>
+
+            {msg && (
+              <div className="alert" role="alert" style={{
+                background: "#fff5f5",
+                color: "#8a1c1c",
+                border: "1px solid #f2c6c6",
+                borderRadius: 8,
+                padding: "10px 12px"
+              }}>
+                {msg}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn primary">
+              {loading ? "処理中…" : mode === "signup" ? "登録する" : "ログイン"}
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              className="btn ghost"
+              onClick={handleGoogle}
+            >
+              Googleでログイン
+            </button>
+
+            <div className="aux">
+              {mode === "signup" ? (
+                <>
+                  すでにアカウントをお持ちですか？
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => { setMode("login"); resetMsg(); }}
+                  >
+                    ログインへ
+                  </button>
+                </>
+              ) : (
+                <>
+                  はじめての方は
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => { setMode("signup"); resetMsg(); }}
+                  >
+                    新規登録
+                  </button>
+                </>
+              )}
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
