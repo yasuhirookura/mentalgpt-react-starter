@@ -12,7 +12,7 @@ export default function LandingPage() {
         <p className="hero-sub">
           対話することで気持ちが整理でき、<br className="sp-only" />
           心がふわっと軽くなる。<br />
-          メンタル相談にチューニングされたAIに、<br className="sp-only" />
+          メンタル相談にアレンジされたAIに、<br className="sp-only" />
           24時間いつでも相談できるサービスです。
 </p>
 {/*
