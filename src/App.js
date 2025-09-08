@@ -13,6 +13,8 @@ import Faq from "./pages/Faq";
 import LoginForm from "./LoginForm";
 import Dashboard from "./Dashboard";
 import SiteFooter from "./components/SiteFooter";
+import MyPage from "./pages/MyPage";
+import Archive from "./pages/Archive";
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
         {/* 認証系 */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/mypage" element={<MyPage />} />
+        <Route path="/archive" element={<Archive />} />
         {/* 404 → LP */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
