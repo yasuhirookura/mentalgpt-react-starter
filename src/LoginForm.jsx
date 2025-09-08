@@ -7,9 +7,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendEmailVerification,
-  sendPasswordResetEmail,   // ← 追加
+  sendPasswordResetEmail,
 } from "firebase/auth";
-import "./LoginForm.css";     // ← 既にリネーム済みの想定
+import "./LoginForm.css";
 
 export default function LoginForm() {
   const [mode, setMode] = useState("login"); // 'login' | 'signup'
@@ -22,44 +22,11 @@ export default function LoginForm() {
 
   const resetMsg = () => setMsg("");
 
-  // ここに hundleSubmit を置く
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setMsg("");
-  console.log("[Login] handleSubmit start", { email, hasPw: !!password });
-
-  try {
-    if (mode === "signup") {
-      // …(既存のサインアップ処理)
-    } else {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      console.log("[Login] signIn success", cred?.user?.uid);
-    }
-  } catch (e) {
-    console.error("[Login] signIn error", e);
-    setMsg(`${e.code ?? "error"}: ${e.message ?? e.toString()}`);
-  }
-};
-
-  // すでにある他の関数たち
-  const handleGoogle = async () => {
-    resetMsg();
-    setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    // 例：handleSubmit の catch 内
-} catch (e) {
-  console.error(e); // ← コンソールにも出す
-  setMsg(`${e.code || 'error'}: ${e.message || '処理に失敗しました。'}`);
-} finally {
-  setLoading(false);
-}
-  };
-
+  // --- ログイン/新規登録 ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetMsg();
+    console.log("[Login] handleSubmit start", { email, hasPw: !!password });
 
     if (!email || !password) {
       setMsg("メールとパスワードを入力してください。");
@@ -78,26 +45,50 @@ export default function LoginForm() {
           setMsg("確認用パスワードが一致しません。");
           return;
         }
+
         const cred = await createUserWithEmailAndPassword(auth, email, password);
+        console.log("[Signup] success", cred?.user?.uid);
+
         if (cred.user && !cred.user.emailVerified) {
           await sendEmailVerification(cred.user);
           setMsg("確認メールを送信しました。受信箱をご確認ください。");
         }
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, password);
+        console.log("[Login] success", cred?.user?.uid);
+
         if (cred.user && !cred.user.emailVerified) {
           setMsg("メールアドレスが未確認です。確認メールを再送します。");
-          try { await sendEmailVerification(cred.user); } catch {}
+          try {
+            await sendEmailVerification(cred.user);
+          } catch {}
         }
       }
     } catch (e) {
-      setMsg(e.message || "処理に失敗しました。");
+      console.error("[Auth error]", e);
+      setMsg(`${e.code || "error"}: ${e.message || "処理に失敗しました。"}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // ▼ 追加：パスワード再設定メール
+  // --- Googleログイン ---
+  const handleGoogle = async () => {
+    resetMsg();
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      console.log("[Google] success", cred?.user?.uid);
+    } catch (e) {
+      console.error("[Google error]", e);
+      setMsg(`${e.code || "error"}: ${e.message || "Googleログインに失敗しました。"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- パスワード再設定 ---
   const handleResetPw = async () => {
     resetMsg();
     if (!email) {
@@ -108,12 +99,9 @@ export default function LoginForm() {
       setLoading(true);
       await sendPasswordResetEmail(auth, email);
       setMsg("パスワード再設定メールを送信しました。受信箱をご確認ください。");
-    } // catch (e) {
-      // よくあるエラー：auth/user-not-found など
-      // setMsg(e.message || "パスワード再設定に失敗しました。");
-      catch (e) {
-      setMsg(`${e.code}: ${e.message}`);
-    }
+    } catch (e) {
+      console.error("[ResetPw error]", e);
+      setMsg(`${e.code || "error"}: ${e.message || "パスワード再設定に失敗しました。"}`);
     } finally {
       setLoading(false);
     }
@@ -194,7 +182,7 @@ export default function LoginForm() {
             Googleでログイン
           </button>
 
-          {/* ▼ 追加：パスワードを忘れた */}
+          {/* ▼ パスワード再設定 */}
           <div className="switch-row">
             <button type="button" className="link" onClick={handleResetPw} disabled={loading}>
               パスワードを忘れた方はこちら
