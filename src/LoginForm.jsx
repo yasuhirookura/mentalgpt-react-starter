@@ -1,50 +1,81 @@
-// 追加
-import { useNavigate } from "react-router-dom";
+// src/LoginForm.jsx
+import React, { useState } from "react";
+import { auth } from "./firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import "./LoginForm.css";
 
 export default function LoginForm() {
-  const navigate = useNavigate();   // ← 追加
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // ...中略...
-
-  const handleSubmit = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setMsg("");
+    console.log("[LoginDbg] submit", { email, hasPw: !!pw });
+
+    if (!email || !pw) {
+      setMsg("メールとパスワードを入力してください。");
+      return;
+    }
 
     try {
       setLoading(true);
-
-      if (mode === "signup") {
-        // 既存のサインアップ処理…
-        // サインアップ直後に遷移（メール未確認でもとりあえずマイページへ）
-        navigate("/mypage");
-      } else {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        console.log("[Login] success:", cred.user?.uid);
-        // ★ ここが重要：ログイン成功時に遷移
-        navigate("/mypage");  // 例）/dashboard でもOK
-      }
+      const cred = await signInWithEmailAndPassword(auth, email, pw);
+      console.log("[LoginDbg] success uid=", cred?.user?.uid);
+      setMsg("ログイン成功");
+      // 成功時はトップへ
+      window.location.assign("/");
     } catch (e) {
-      console.error(e);
-      setMsg(`${e.code ?? "error"}: ${e.message ?? e.toString()}`);
+      console.error("[LoginDbg] error", e);
+      // ここに必ずエラーコードが出るはずです
+      setMsg(`${e.code || "error"}: ${e.message || e.toString()}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Google ログインも同様に
-  const handleGoogle = async () => {
-    setMsg("");
-    setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const cred = await signInWithPopup(auth, provider);
-      console.log("[Login] Google success:", cred.user?.uid);
-      navigate("/mypage");   // ← 追加
-    } catch (e) {
-      console.error(e);
-      setMsg(`${e.code ?? "error"}: ${e.message ?? e.toString()}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h1 className="brand">
+          <span className="muted">あなたの心にやさしく寄り添う</span><br/>
+          <span className="brand-strong">MentalGPT</span>
+          <span className="muted"> powered by ChatGPT</span>
+          <span className="beta"> β版</span>
+        </h1>
+
+        <form className="auth-form" onSubmit={onSubmit}>
+          <label>
+            メールアドレス
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              placeholder="you@example.com"
+            />
+          </label>
+
+          <label>
+            パスワード
+            <input
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              autoComplete="current-password"
+              placeholder="********"
+            />
+          </label>
+
+          {msg && <div className="alert">{msg}</div>}
+
+          <button className="primary" type="submit" disabled={loading}>
+            {loading ? "処理中…" : "ログイン"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }
