@@ -22,17 +22,39 @@ export default function LoginForm() {
 
   const resetMsg = () => setMsg("");
 
+  // ここに hundleSubmit を置く
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setMsg("");
+  console.log("[Login] handleSubmit start", { email, hasPw: !!password });
+
+  try {
+    if (mode === "signup") {
+      // …(既存のサインアップ処理)
+    } else {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      console.log("[Login] signIn success", cred?.user?.uid);
+    }
+  } catch (e) {
+    console.error("[Login] signIn error", e);
+    setMsg(`${e.code ?? "error"}: ${e.message ?? e.toString()}`);
+  }
+};
+
+  // すでにある他の関数たち
   const handleGoogle = async () => {
     resetMsg();
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (e) {
-      setMsg(e.message || "Googleログインに失敗しました");
-    } finally {
-      setLoading(false);
-    }
+    // 例：handleSubmit の catch 内
+} catch (e) {
+  console.error(e); // ← コンソールにも出す
+  setMsg(`${e.code || 'error'}: ${e.message || '処理に失敗しました。'}`);
+} finally {
+  setLoading(false);
+}
   };
 
   const handleSubmit = async (e) => {
@@ -86,9 +108,12 @@ export default function LoginForm() {
       setLoading(true);
       await sendPasswordResetEmail(auth, email);
       setMsg("パスワード再設定メールを送信しました。受信箱をご確認ください。");
-    } catch (e) {
+    } // catch (e) {
       // よくあるエラー：auth/user-not-found など
-      setMsg(e.message || "パスワード再設定に失敗しました。");
+      // setMsg(e.message || "パスワード再設定に失敗しました。");
+      catch (e) {
+      setMsg(`${e.code}: ${e.message}`);
+    }
     } finally {
       setLoading(false);
     }
