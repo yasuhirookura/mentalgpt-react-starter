@@ -19,9 +19,7 @@ export default function Archive() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u || null);
-    });
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
     return () => unsub();
   }, []);
 
@@ -43,17 +41,36 @@ export default function Archive() {
     if (!user || (!isFirst && !hasMore)) return;
     setLoading(true);
     try {
-      const col = collection(db, "users", user.uid, "posts");
+      // ★ 実データに合わせて conversations を参照
+      const col = collection(db, "conversations");
+
+      // status は存在しない既存レコードがあるので、クエリでは uid のみで絞り、
+      // 取得後に JS 側で tab をフィルタする（既存は archived とみなす）
       const base = query(
         col,
-        where("status", "==", tab), // "archived" or "trash"
+        where("uid", "==", user.uid),
         orderBy("createdAt", "desc"),
         limit(PAGE_SIZE)
       );
       const q = cursor ? query(base, startAfter(cursor)) : base;
       const snap = await getDocs(q);
 
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // 既存スキーマに合わせて整形
+      const docs = snap.docs.map((d) => {
+        const raw = d.data();
+        return {
+          id: d.id,
+          // 既存のフィールド名に合わせて本文を決める（なければ空文字）
+          content: raw.content ?? raw.userMessage ?? "",
+          createdAt: raw.createdAt,
+          updatedAt: raw.updatedAt ?? raw.createdAt,
+          status: raw.status ?? "archived",         // ← 無いものは archived とみなす
+          graceUntil: raw.graceUntil ?? null,
+        };
+      })
+      // JS 側でタブ（archived / trash）を反映
+      .filter(it => it.status === tab);
+
       setItems((prev) => [...prev, ...docs]);
       const last = snap.docs[snap.docs.length - 1] || null;
       setCursor(last);
@@ -68,18 +85,16 @@ export default function Archive() {
 
   const actions = useMemo(() => ({
     async remove(id) {
-      // ソフト削除：ゴミ箱へ移動 + 7日グレース
       if (!user) return;
-      const ref = doc(db, "users", user.uid, "posts", id);
+      const ref = doc(db, "conversations", id);
       const grace = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
       await updateDoc(ref, { status: "trash", graceUntil: grace, updatedAt: serverTimestamp() });
-      // 画面からは即座に消す
       setItems((prev) => prev.filter((x) => x.id !== id));
     },
     async restore(id) {
       if (!user) return;
-      const ref = doc(db, "users", user.uid, "posts", id);
-      await updateDoc(ref, { status: "archived", updatedAt: serverTimestamp(), graceUntil: null });
+      const ref = doc(db, "conversations", id);
+      await updateDoc(ref, { status: "archived", graceUntil: null, updatedAt: serverTimestamp() });
       setItems((prev) => prev.filter((x) => x.id !== id));
     }
   }), [user]);
@@ -103,16 +118,10 @@ export default function Archive() {
 
       {/* タブ */}
       <div className="tabs" style={{ marginBottom: 16 }}>
-        <button
-          className={`tab ${tab === "archived" ? "active" : ""}`}
-          onClick={() => setTab("archived")}
-        >
+        <button className={`tab ${tab === "archived" ? "active" : ""}`} onClick={() => setTab("archived")}>
           アーカイブ
         </button>
-        <button
-          className={`tab ${tab === "trash" ? "active" : ""}`}
-          onClick={() => setTab("trash")}
-        >
+        <button className={`tab ${tab === "trash" ? "active" : ""}`} onClick={() => setTab("trash")}>
           ゴミ箱（削除保留中）
         </button>
       </div>
@@ -165,13 +174,9 @@ function ArchiveItem({ item, tab, onRemove, onRestore }) {
         </div>
         <div className="actions" style={{ display: "grid", gap: 8, alignContent: "start" }}>
           {tab === "archived" ? (
-            <button className="btn secondary" onClick={onRemove} title="ゴミ箱へ移動">
-              削除
-            </button>
+            <button className="btn secondary" onClick={onRemove} title="ゴミ箱へ移動">削除</button>
           ) : (
-            <button className="btn" onClick={onRestore} title="アーカイブへ戻す">
-              復元
-            </button>
+            <button className="btn" onClick={onRestore} title="アーカイブへ戻す">復元</button>
           )}
         </div>
       </div>
@@ -186,24 +191,14 @@ function formatDateTime(tsOrIso) {
     if (tsOrIso?.toDate) d = tsOrIso.toDate();
     else if (typeof tsOrIso === "string") d = new Date(tsOrIso);
     else d = new Date(tsOrIso);
-    return d.toLocaleString("ja-JP", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit"
-    });
+    return d.toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
   } catch {
     return "—";
   }
 }
-
-// プラン表示をざっくり（MVP：ユーザードキュメント読み込みが重い場合の代替）
 function uPlanFromLocal() {
   try {
-    const raw = localStorage.getItem("mgpt_user_plan");
-    return raw || "light";
-  } catch {
-    return "light";
-  }
+    return localStorage.getItem("mgpt_user_plan") || "light";
+  } catch { return "light"; }
 }
-function planText(code) {
-  return code === "standard" ? "90日" : "30日";
-}
+function planText(code) { return code === "standard" ? "90日" : "30日"; }
