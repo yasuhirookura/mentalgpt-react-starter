@@ -1,6 +1,10 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -15,8 +19,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
-// ★ 追加：ログイン状態をブラウザに保持
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+// ← ここがポイント：initializeAuth で複数の永続化方式を指定
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 
 export const db = getFirestore(app);
+
+// “auth の初期化完了”を待つためのフック（任意）
+export const authReady = Promise.resolve();
