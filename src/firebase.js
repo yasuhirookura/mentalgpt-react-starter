@@ -4,12 +4,14 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "…",
+  // ← ここはあなたのコンソールの値をそのまま
+  apiKey: "AIzaSyBG3jGtcLYsYt2X6Zem-W0-r5BdQR14XTI",
   authDomain: "mentalgpt-19189.firebaseapp.com",
   projectId: "mentalgpt-19189",
-  storageBucket: "mentalgpt-19189.appspot.com",
-  messagingSenderId: "…",
-  appId: "…",
+  storageBucket: "mentalgpt-19189.firebasestorage.app",
+  messagingSenderId: "159888180556",
+  appId: "1:159888180556:web:6bbc310de7dcb716847be9",
+  measurementId: "G-E70WT63FH5"
 };
 
 const app = initializeApp(firebaseConfig);
