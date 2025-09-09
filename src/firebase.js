@@ -1,5 +1,28 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "…",
+  authDomain: "mentalgpt-19189.firebaseapp.com",
+  projectId: "mentalgpt-19189",
+  storageBucket: "mentalgpt-19189.appspot.com",
+  messagingSenderId: "…",
+  appId: "…",
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+// ★ 追加：ログイン状態をブラウザに保持
+setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+export const db = getFirestore(app);
+
+/*
+// src/firebase.js
+import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
