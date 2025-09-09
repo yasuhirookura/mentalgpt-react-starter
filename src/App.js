@@ -1,4 +1,7 @@
 // src/App.js
+// どちらか片方に追加
+import "./lib/windowApi";  // ← window.api をセット
+
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
