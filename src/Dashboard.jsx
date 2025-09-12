@@ -55,9 +55,33 @@ export default function Dashboard() {
       setMessages(prev => [...prev, userMsg]);
       setTodayCount(c => c + 1);
 
+
+      // サーバーへ送信（OpenAI呼び出し＋保存）
+     const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+     const API_BASE = isLocal ? "https://<あなたの本番ドメイン>" : "";
+
+     const res = await fetch(`${API_BASE}/api/chat`, {
+     method: "POST",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ text: body }),});
+     if (!res.ok) {
+     const t = await res.text().catch(() => "");
+     throw new Error(`POST /api/chat failed: ${res.status} ${t}`);
+}
+     const data = await res.json();
+     const aiMsg = {
+     id: `ai_${Date.now()}`,
+     role: "ai",
+     content: data.content ?? "(応答なし)",
+     createdAt: new Date().toISOString(),
+};
+
+     setMessages(prev => [...prev.filter(m => m.id !== tempId), userMsg, aiMsg]);
+      /*
       // サーバーへ送信（OpenAI呼び出し＋保存）
       const aiMsg = await window.api.sendMessage(body); // { id, role:"ai", content, createdAt }
       setMessages(prev => [...prev.filter(m => m.id !== tempId), userMsg, aiMsg]);
+      */
 
       // スクロール追従
       setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
