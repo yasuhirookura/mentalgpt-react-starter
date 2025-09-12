@@ -1,8 +1,6 @@
 // src/pages/Dashboard.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-// Firestore 読み書きは既存の util/ hooks に合わせて差し替えてください
-// 例：getTodayCount(uid), incrementCount(uid), fetchRecentMessages(uid), sendMessage(text)
 
 const MAX = 400;
 const HINTS = [
@@ -11,6 +9,10 @@ const HINTS = [
   "あなたの気持ちに寄り添っています…",
   "少しだけお待ちください…"
 ];
+
+// ← 本番の安定URL（必要なら自動生成の長いURLに差し替えOK）
+// 例）"https://mentalgpt-react-starter-xxxxxxxx.yasuhirookuras-projects.vercel.app"
+const PROD_BASE = "https://mentalgpt-react-starter.vercel.app";
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -23,12 +25,11 @@ export default function Dashboard() {
   const [planLimit, setPlanLimit] = useState(10);    // "trial/ライト=10、スタンダード=30" とりあえず10で
   const endRef = useRef(null);
 
-  // ▼ ここはあなたの実装に合わせて置き換え
   async function fetchInitial() {
-    // 直近のメッセージ（配列を新しい順 or 古い順、どちらでもOK）
-    const items = await window.api.fetchRecentMessages({ limit: 50 }); // 例
+    // ※ ここは既存の実装に合わせて差し替え想定
+    const items = await window.api.fetchRecentMessages({ limit: 50 });
     setMessages(items || []);
-    const count = await window.api.getTodayCount(); // 例：users/{uid}/usage/{YYYY-MM-DD}.count
+    const count = await window.api.getTodayCount();
     setTodayCount(count || 0);
     const plan = await window.api.getPlan(); // "light" | "standard" | "trial"
     setPlanLimit(plan === "standard" ? 30 : 10);
@@ -39,7 +40,7 @@ export default function Dashboard() {
     if (!body) return;
     if (body.length > MAX) return;
     if (isLoading) return;
-    // フロント側軽ガード（サーバーenforceは後日）
+
     if (todayCount >= planLimit) {
       alert("本日の上限に達しました。明日またご利用ください。");
       return;
@@ -49,46 +50,55 @@ export default function Dashboard() {
     try {
       setText("");
       localStorage.setItem("draft", "");
-      // 送信直後にユーザー投稿を先行表示（楽観的UI）
+
+      // 楽観的追加
       const tempId = `temp_${Date.now()}`;
       const userMsg = { id: tempId, role: "user", content: body, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, userMsg]);
       setTodayCount(c => c + 1);
 
+      // ▼ API 送信（ローカル→本番の /api/chat を叩く）
+      const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+      const isLocal =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1";
+      const API_BASE = isLocal ? PROD_BASE : ""; // 本番上では相対 /api/chat を使う
 
-      // サーバーへ送信（OpenAI呼び出し＋保存）
-     const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-     const API_BASE = isLocal ? "https://<あなたの本番ドメイン>" : "";
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: body }),
+      });
 
-     const res = await fetch(`${API_BASE}/api/chat`, {
-     method: "POST",
-     headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ text: body }),});
-     if (!res.ok) {
-     const t = await res.text().catch(() => "");
-     throw new Error(`POST /api/chat failed: ${res.status} ${t}`);
-}
-     const data = await res.json();
-     const aiMsg = {
-     id: `ai_${Date.now()}`,
-     role: "ai",
-     content: data.content ?? "(応答なし)",
-     createdAt: new Date().toISOString(),
-};
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`POST /api/chat failed: ${res.status} ${t}`);
+      }
 
-     setMessages(prev => [...prev.filter(m => m.id !== tempId), userMsg, aiMsg]);
-      /*
-      // サーバーへ送信（OpenAI呼び出し＋保存）
-      const aiMsg = await window.api.sendMessage(body); // { id, role:"ai", content, createdAt }
+      const data = await res.json();
+      const aiMsg = {
+        id: `ai_${Date.now()}`,
+        role: "ai",
+        content: data.content ?? "(応答なし)",
+        createdAt: new Date().toISOString(),
+      };
+
       setMessages(prev => [...prev.filter(m => m.id !== tempId), userMsg, aiMsg]);
-      */
 
       // スクロール追従
       setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
     } catch (e) {
-      // 失敗時は回数を戻す & 失敗メッセージ
+      console.error("[send] error", e);
       setTodayCount(c => Math.max(0, c - 1));
-      setMessages(prev => [...prev, { id: `err_${Date.now()}`, role: "system", content: "送信に失敗しました。もう一度お試しください。", createdAt: new Date().toISOString() }]);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `err_${Date.now()}`,
+          role: "system",
+          content: "送信に失敗しました。もう一度お試しください。",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -177,18 +187,10 @@ export default function Dashboard() {
 
         <div ref={endRef} />
       </section>
-
-      {/* ちょいCSS（site.css に追加） */}
-      {/* 
-      @keyframes pulse { 0%{transform:scale(1);opacity:.8} 50%{transform:scale(1.25);opacity:1} 100%{transform:scale(1);opacity:.8} }
-      .btn{cursor:pointer}
-      .btn[disabled]{opacity:.6; cursor:not-allowed}
-      */}
     </main>
   );
 }
 
-// 表示用の簡易バブル
 function MessageBubble({ role, content, createdAt }) {
   const isUser = role === "user";
   return (
