@@ -12,7 +12,7 @@ const HINTS = [
 
 // ← 本番の安定URL（必要なら自動生成の長いURLに差し替えOK）
 // 例）"https://mentalgpt-react-starter-xxxxxxxx.yasuhirookuras-projects.vercel.app"
-const PROD_BASE = "https://mentalgpt-react-starter.vercel.app";
+const PROD_BASE = "https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app/";
 
 export default function Dashboard() {
   const nav = useNavigate();
