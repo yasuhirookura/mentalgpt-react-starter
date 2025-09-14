@@ -12,9 +12,9 @@ import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import About from "./pages/About";
 import Faq from "./pages/Faq";
+import Dashboard from "./pages/Dashboard";
 
 import LoginForm from "./LoginForm";
-import Dashboard from "./Dashboard";
 import SiteFooter from "./components/SiteFooter";
 import MyPage from "./pages/MyPage";
 import Archive from "./pages/Archive";
