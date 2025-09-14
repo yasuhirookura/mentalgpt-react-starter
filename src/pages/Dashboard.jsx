@@ -20,10 +20,10 @@ const nav = useNavigate();
 const [text, setText] = useState(localStorage.getItem("draft") || "");
 const [isLoading, setIsLoading] = useState(false);
 const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
-const [messages, setMessages] = useState([]); // { id, role:"user"|"ai"|"system", content, createdAt }
+const [messages, setMessages] = useState([]); 
 const [pageCount, setPageCount] = useState(10);
-const [todayCount, setTodayCount] = useState(0); // MVP: 表示用
-const [planLimit, setPlanLimit] = useState(10); // MVP: 10固定（後で連携）
+const [todayCount, setTodayCount] = useState(0); 
+const [planLimit, setPlanLimit] = useState(10); 
 const endRef = useRef(null);
 
 // 初期ロード（MVPではダミー）
@@ -71,7 +71,7 @@ setTodayCount(c => c + 1);
 // ▼ 送信部：ローカルなら本番の /api/chat を叩く
 const host = typeof window !== "undefined" ? window.location.hostname : "";
 const isLocal = host === "localhost" || host === "127.0.0.1";
-const API_BASE = isLocal ? PROD_BASE : ""; // 本番(Vercel)では相対パスでOK
+const API_BASE = isLocal ? PROD_BASE : ""; 
 
 console.log("[send] POST", `${API_BASE}/api/chat`, { message: body });
 const res = await fetch(`${API_BASE}/api/chat`, {
@@ -152,13 +152,13 @@ return (
   onChange={(e) => setText(e.target.value)}
   onKeyDown={onKeyDown}
   placeholder="いまの気持ちを自由に書いてください（400文字まで）"
-  minRows={4} // 初期の高さ
-  maxRows={12} // 伸びる上限（お好みで調整）
+  minRows={4} 
+  maxRows={12} 
   style={{
     width: "100%",
     border: "none",
     outline: "none",
-    resize: "none", // 手動リサイズは無効（自動伸縮に任せる）
+    resize: "none", 
     lineHeight: 1.8,
     fontSize: 16
   }}
