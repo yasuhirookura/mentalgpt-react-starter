@@ -160,6 +160,6 @@ return (
     outline: "none",
     resize: "none", 
     lineHeight: 1.8,
-    fontSize: 16
-   )}
+    fontSize: 16,
+   }}
   />
