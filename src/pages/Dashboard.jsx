@@ -161,5 +161,5 @@ return (
     resize: "none", 
     lineHeight: 1.8,
     fontSize: 16
-  }}
-/>
+   )}
+  />
