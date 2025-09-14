@@ -148,18 +148,18 @@ return (
 {/* 入力 */}
 <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
 <TextareaAutosize
-value={text}
-onChange={(e) => setText(e.target.value)}
-onKeyDown={onKeyDown}
-placeholder="いまの気持ちを自由に書いてください（400文字まで）"
-minRows={4} // 初期の高さ
-maxRows={12} // 伸びる上限（お好みで調整）
-style={{
-width: "100%",
-border: "none",
-outline: "none",
-resize: "none", // 手動リサイズは無効（自動伸縮に任せる）
-lineHeight: 1.8,
-fontSize: 16
-}}
+  value={text}
+  onChange={(e) => setText(e.target.value)}
+  onKeyDown={onKeyDown}
+  placeholder="いまの気持ちを自由に書いてください（400文字まで）"
+  minRows={4} // 初期の高さ
+  maxRows={12} // 伸びる上限（お好みで調整）
+  style={{
+    width: "100%",
+    border: "none",
+    outline: "none",
+    resize: "none", // 手動リサイズは無効（自動伸縮に任せる）
+    lineHeight: 1.8,
+    fontSize: 16
+  }}
 />
