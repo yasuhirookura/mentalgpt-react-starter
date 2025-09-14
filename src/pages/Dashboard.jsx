@@ -11,9 +11,8 @@ const HINTS = [
 "少しだけお待ちください…"
 ];
 
-// ← 本番のデプロイURL（末尾スラッシュなし）
-const PROD_BASE =
-"https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app";
+// ← Vercel の本番URL（末尾スラッシュなし・あなたのURLに置換OK）
+const PROD_BASE = "https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app";
 
 export default function Dashboard() {
 const nav = useNavigate();
@@ -23,15 +22,15 @@ const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
 const [messages, setMessages] = useState([]); // { id, role:"user"|"ai"|"system", content, createdAt }
 const [pageCount, setPageCount] = useState(10);
 const [todayCount, setTodayCount] = useState(0); // MVP: 表示用
-const [planLimit, setPlanLimit] = useState(10); // MVP: 10固定（後で連携）
+const [planLimit, setPlanLimit] = useState(10); // MVP: 10固定
 const endRef = useRef(null);
 
-// 初期ロード（MVPではダミー）
 async function fetchInitial() {
 try {
+// 後で Firestore/自前API に差し替え
 setMessages([]);
 setTodayCount(0);
-setPlanLimit(10); // 標準なら30に
+setPlanLimit(10);
 } catch (e) {
 console.error("[init] error", e);
 }
@@ -39,9 +38,7 @@ console.error("[init] error", e);
 
 async function handleSend() {
 const body = text.trim();
-if (!body) return;
-if (body.length > MAX) return;
-if (isLoading) return;
+if (!body || body.length > MAX || isLoading) return;
 
 if (todayCount >= planLimit) {
 alert("本日の上限に達しました。明日またご利用ください。");
@@ -49,16 +46,17 @@ return;
 }
 
 setIsLoading(true);
+
 const tempId = `temp_${Date.now()}`;
 const userMsg = {
 id: tempId,
 role: "user",
 content: body,
-createdAt: new Date().toISOString()
+createdAt: new Date().toISOString(),
 };
 
 try {
-// 入力欄クリア（失敗したら復元する）
+// 入力欄クリア（失敗したら復元）
 setText("");
 localStorage.setItem("draft", "");
 
@@ -66,16 +64,19 @@ localStorage.setItem("draft", "");
 setMessages(prev => [...prev, userMsg]);
 setTodayCount(c => c + 1);
 
-// ▼ 送信部：ローカルなら本番の /api/chat を叩く
+// ローカル(CRA)では本番のAPIへ、Vercel本番では相対パスでOK
 const host = typeof window !== "undefined" ? window.location.hostname : "";
 const isLocal = host === "localhost" || host === "127.0.0.1";
-const API_BASE = isLocal ? PROD_BASE : ""; // 本番(Vercel)では相対パスでOK
+const API_BASE = isLocal ? PROD_BASE : "";
 
-console.log("[send] POST", `${API_BASE}/api/chat`, { message: body });
-const res = await fetch(`${API_BASE}/api/chat`, {
+const url = `${API_BASE}/api/chat`;
+console.log("[send] POST", url);
+
+const res = await fetch(url, {
 method: "POST",
 headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ message: body }) // server(api/chat.js) の期待どおり "message"
+// api/chat.js は {message} を期待
+body: JSON.stringify({ message: body }),
 });
 
 if (!res.ok) {
@@ -87,16 +88,19 @@ const data = await res.json();
 const aiMsg = {
 id: `ai_${Date.now()}`,
 role: "ai",
-// server は { text } を返す実装なので両対応
+// api/chat.js は { text } を返すよう修正済み
 content: data.text ?? data.content ?? "(応答なし)",
-createdAt: new Date().toISOString()
+createdAt: new Date().toISOString(),
 };
 
+// temp は残したまま、順番に積む
 setMessages(prev => [...prev, aiMsg]);
 
+// スクロール追従
 setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
 } catch (e) {
 console.error("[send] error", e);
+// 失敗時は回数戻し & 入力復元
 setTodayCount(c => Math.max(0, c - 1));
 setText(body);
 localStorage.setItem("draft", body);
@@ -106,17 +110,17 @@ setMessages(prev => [
 id: `err_${Date.now()}`,
 role: "system",
 content: "送信に失敗しました。もう一度お試しください。",
-createdAt: new Date().toISOString()
-}
+createdAt: new Date().toISOString(),
+},
 ]);
 } finally {
 setIsLoading(false);
 }
 }
 
-// Enterは改行・送信はボタンのみ
-function onKeyDown(e) {
-// 何もしない（Enter送信を無効）
+// Enter=改行のみ（送信はボタン）
+function onKeyDown(_e) {
+// 何もしない（IME確定Enter誤送信防止）
 }
 
 useEffect(() => { fetchInitial(); }, []);
@@ -139,22 +143,23 @@ return (
 </span>
 </header>
 
-{/* 入力欄 */}
+{/* 入力 */}
 <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
 <TextareaAutosize
 value={text}
 onChange={(e) => setText(e.target.value)}
 onKeyDown={onKeyDown}
 placeholder="いまの気持ちを自由に書いてください（400文字まで）"
-minRows={4} /* 初期の高さ */
-maxRows={12} /* 伸びる上限 */
+minRows={4}
+maxRows={12}
 style={{
 width: "100%",
 border: "none",
 outline: "none",
-resize: "none", // 手動リサイズは無効
+resize: "none",
+height: "auto", // 固定高の上書き
 lineHeight: 1.8,
-fontSize: 16
+fontSize: 16,
 }}
 />
 
@@ -177,8 +182,9 @@ className="btn btn-primary"
 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "#3b6" }}>
 <span style={{
 width: 10, height: 10, borderRadius: "50%",
-animation: "pulse 1.2s ease-in-out infinite",
-display: "inline-block", background: "#39f"
+background: "#39f",
+display: "inline-block",
+animation: "pulse 1.2s ease-in-out infinite"
 }} />
 <span style={{ fontSize: 13 }}>{hint}</span>
 </div>
