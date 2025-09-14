@@ -11,6 +11,10 @@ const HINTS = [
 "少しだけお待ちください…"
 ];
 
+// ← 本番のデプロイURL（末尾スラッシュなし）
+const PROD_BASE =
+"https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app";
+
 export default function Dashboard() {
 const nav = useNavigate();
 const [text, setText] = useState(localStorage.getItem("draft") || "");
@@ -64,10 +68,16 @@ localStorage.setItem("draft", "");
 setMessages(prev => [...prev, userMsg]);
 setTodayCount(c => c + 1);
 
-console.log("[send] POST /api/chat", { message: body });
-const res = await fetch("/api/chat", {
+// ▼ 送信部：ローカルなら本番の /api/chat を叩く
+const host = typeof window !== "undefined" ? window.location.hostname : "";
+const isLocal = host === "localhost" || host === "127.0.0.1";
+const API_BASE = isLocal ? PROD_BASE : ""; // 本番(Vercel)では相対パスでOK
+
+console.log("[send] POST", `${API_BASE}/api/chat`, { message: body });
+const res = await fetch(`${API_BASE}/api/chat`, {
 method: "POST",
 headers: { "Content-Type": "application/json" },
+// ← server(api/chat.js) の期待どおり "message" で送る
 body: JSON.stringify({ message: body })
 });
 
@@ -80,11 +90,12 @@ const data = await res.json();
 const aiMsg = {
 id: `ai_${Date.now()}`,
 role: "ai",
-content: data.content ?? "(応答なし)",
+// serverは { text } を返す実装なので両対応
+content: data.text ?? data.content ?? "(応答なし)",
 createdAt: new Date().toISOString()
 };
 
-// temp はそのまま残し、順に積む（見た目は時系列）
+// tempはそのまま残し、順に積む（見た目は時系列）
 setMessages(prev => [...prev, aiMsg]);
 
 // スクロール追従
@@ -136,112 +147,19 @@ return (
 
 {/* 入力 */}
 <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
-
-  <TextareaAutosize
-  value={text}
-  onChange={(e) => setText(e.target.value)}
-  placeholder="いまの気持ちを自由に書いてください（400文字まで）"
-  minRows={4} // 初期の高さ
-  maxRows={12} // 伸びる上限（お好みで調整）
-  style={{
-  width: "100%",
-  border: "none",
-  outline: "none",
-  resize: "none", // 手動リサイズは無効（自動伸縮に任せる）
-  lineHeight: 1.8,
-  fontSize: 16
-  }}
-/>
-
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-<span style={{ fontSize: 13, color: over ? "#c00" : "#666" }}>
-{Math.min(text.length, MAX)} / {MAX}
-</span>
-<div style={{ marginLeft: "auto" }}>
-<button
-onClick={handleSend}
-disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
-className="btn btn-primary"
->
-{isLoading ? "考え中…" : "送信"}
-</button>
-</div>
-</div>
-{isLoading && (
-<div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "#3b6" }}>
-<span style={{
-width: 10, height: 10, borderRadius: "50%",
-animation: "pulse 1.2s ease-in-out infinite",
-display: "inline-block", background: "#39f"
-}} />
-<span style={{ fontSize: 13 }}>{hint}</span>
-</div>
-)}
-</div>
-
-{/* 履歴 */}
-<section>
-{visibleMessages.map(m => (
-<MessageBubble key={m.id} role={m.role} content={m.content} createdAt={m.createdAt} />
-))}
-
-{/* もっと見る or アーカイブ */}
-{messages.length > pageCount ? (
-<div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-<button className="btn btn-outline" onClick={() => setPageCount(c => c + 10)}>もっと見る</button>
-<span style={{ margin: "0 8px", color: "#999" }}> / </span>
-<Link to="/archive">アーカイブ</Link>
-</div>
-) : (
-<div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-<Link to="/archive">アーカイブへ</Link>
-</div>
-)}
-
-<div ref={endRef} />
-</section>
-
-{/* ちょいCSS（site.css に追加してOK）
-@keyframes pulse { 0%{transform:scale(1);opacity:.8} 50%{transform:scale(1.25);opacity:1} 100%{transform:scale(1);opacity:.8} }
-.btn{cursor:pointer}
-.btn[disabled]{opacity:.6; cursor:not-allowed}
-*/}
-</main>
-);
-}
-
-function MessageBubble({ role, content, createdAt }) {
-const isUser = role === "user";
-return (
-<div style={{
-display: "flex",
-justifyContent: isUser ? "flex-end" : "flex-start",
-marginBottom: 8
-}}>
-<div style={{
-background: isUser ? "#e7f1ff" : "#f6f6f6",
-border: "1px solid #ddd",
-padding: "10px 12px",
-borderRadius: 12,
-maxWidth: "85%",
+<TextareaAutosize
+value={text}
+onChange={(e) => setText(e.target.value)}
+onKeyDown={onKeyDown}
+placeholder="いまの気持ちを自由に書いてください（400文字まで）"
+minRows={4} // 初期の高さ
+maxRows={12} // 伸びる上限（お好みで調整）
+style={{
+width: "100%",
+border: "none",
+outline: "none",
+resize: "none", // 手動リサイズは無効（自動伸縮に任せる）
 lineHeight: 1.8,
-whiteSpace: "pre-wrap",
-wordBreak: "break-word",
-}}>
-<div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>
-{isUser ? "あなた" : "MentalGPT"} ・ {formatTime(createdAt)}
-</div>
-<div>{content}</div>
-</div>
-</div>
-);
-}
-
-function formatTime(ts) {
-try {
-const d = new Date(ts);
-return d.toLocaleString("ja-JP");
-} catch {
-return "";
-}
-}
+fontSize: 16
+}}
+/>
