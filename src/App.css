@@ -5,15 +5,27 @@
   background: white;
   border-radius: 8px;
 }
+/* Autosize用: 高さ固定を解除 */
+textarea {
+height: auto !important;
+max-height: none !important;
+resize: none;
+box-sizing: border-box;
+line-height: 1.8;
+}
+/*
 textarea {
   width: 400px; /* またはお好みの幅、例: 80%など */
+  /*
   max-width: 100%;
   /*
   width: 100%;
   height: 100px;
   margin-bottom: 10px;
   */
+  /*
 }
+*/
 button {
   padding: 10px 20px;
 }

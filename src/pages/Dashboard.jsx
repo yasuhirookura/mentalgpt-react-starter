@@ -11,8 +11,11 @@ const HINTS = [
 "少しだけお待ちください…"
 ];
 
+const PROD_BASE = "https://mentalgpt.okulab.com";
+/*
 // ← Vercel の本番URL（末尾スラッシュなし・あなたのURLに置換OK）
 const PROD_BASE = "https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app";
+*/
 
 export default function Dashboard() {
 const nav = useNavigate();

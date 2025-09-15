@@ -1,4 +1,6 @@
 // src/App.js
+import "./App.css";
+
 // どちらか片方に追加
 import "./lib/windowApi";  // ← window.api をセット
 
