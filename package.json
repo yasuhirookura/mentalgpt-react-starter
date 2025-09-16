@@ -13,21 +13,14 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
-    "vercel-build": "echo '== versions on vercel ==' && node -e \"const v=p=>require(p+'/package.json').version; console.log('react',v('react'),'react-dom',v('react-dom'));\" && echo '== grep React5 / use from react ==' && (grep -Rni \"import\\s*\\*\\s*as\\s*React5\\s*from\\s*['\\\"]react['\\\"]\" src || true) && (grep -Rni \"import\\s*React5\\s*,\\s*{[^}]*use[^}]*}\\s*from\\s*['\\\"]react['\\\"]\" src || true) && (grep -Rni \"from\\s*['\\\"]react5['\\\"]\" src || true) && (grep -Rni \"import\\s*{\\s*use\\s*}\\s*from\\s*['\\\"]react['\\\"]\" src || true) && CI=false react-scripts build",
+    "vercel-build": "...省略...",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
+  "proxy": "https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app", // ← ここを追加
   "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "production": [">0.2%","not dead","not op_mini all"],
+    "development": ["last 1 chrome version","last 1 firefox version","last 1 safari version"]
   },
   "engines": {
     "node": "22.x"
@@ -37,13 +30,8 @@
     "eslint-plugin-react-hooks": "^4.6.2"
   },
   "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ],
-    "plugins": [
-      "react-hooks"
-    ],
+    "extends": ["react-app","react-app/jest"],
+    "plugins": ["react-hooks"],
     "rules": {
       "react-hooks/exhaustive-deps": "off"
     }
