@@ -77,19 +77,11 @@ export default function Dashboard() {
 
     try {
       // ローカル → 本番の /api/chat を叩く（本番上では相対パスでOK）
-      const host = typeof window !== "undefined" ? window.location.hostname : "";
-      const isLocal = host === "localhost" || host === "127.0.0.1";
-      const API_BASE = isLocal ? PROD_BASE : ""; // 本番(Vercel)では ""（相対）
-
-      // デバッグ
-      // console.log("[send] POST", `${API_BASE}/api/chat`, { message: body });
-
-      const res = await fetch(`${API_BASE}/api/chat`, {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // server(api/chat.js) の期待どおり "message" で送る
         body: JSON.stringify({ message: body }),
-      });
+    });
 
       if (!res.ok) {
         const t = await res.text().catch(() => "");
