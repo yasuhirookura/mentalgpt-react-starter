@@ -238,29 +238,29 @@ fontSize: 16,
   disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
   title={over ? "文字数が多すぎます" : "送信"}
   style={{
-    width: 44,
-    height: 44,
-    borderRadius: "999px",
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
     border: "none",
-    // ← ボタンの背景色が青い円になります（有効/無効で色分け）
-    background:
-      isLoading || !text.trim() || over || todayCount >= planLimit ? "#9bbcf7" : "#0a6cff",
-    color: "#fff",
+    background: "transparent", // 👈 背景を透明にする（青の二重防止）
     display: "grid",
     placeItems: "center",
     cursor:
-      isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "pointer",
+      isLoading || !text.trim() || over || todayCount >= planLimit
+        ? "not-allowed"
+        : "pointer",
   }}
 >
-  {/* ⬇️ SVGは白い三角だけ（青い <circle> は削除） */}
   <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
+    width="48"
+    height="48"
+    viewBox="0 0 48 48"
     xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
   >
-    <polygon points="8,6 18,12 8,18" fill="white" />
+    {/* 青い円 */}
+    <circle cx="24" cy="24" r="23" fill="#0a6cff" />
+    {/* 白い三角形（大きく中央配置） */}
+    <polygon points="18,12 36,24 18,36" fill="white" />
   </svg>
 </button>
 </div>
