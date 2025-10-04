@@ -252,8 +252,15 @@ isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "
 }}
 >
 {/* 青い円に白い三角形（送信アイコン） */}
-<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-<path d="M3.4 20.6l17.2-8.6L3.4 3.4 5.8 11l9 1-9 1z" />
+<svg
+  width="22"
+  height="22"
+  viewBox="0 0 24 24"
+  fill="white"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <circle cx="12" cy="12" r="11" fill="#0a6cff" />
+  <polygon points="9,7 17,12 9,17" fill="white" />
 </svg>
 </button>
 </div>
