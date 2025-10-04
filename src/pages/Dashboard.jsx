@@ -234,33 +234,34 @@ fontSize: 16,
 />
 
 <button
-onClick={handleSend}
-disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
-title={over ? "文字数が多すぎます" : "送信"}
-style={{
-width: 44,
-height: 44,
-borderRadius: "999px",
-border: "none",
-background:
-isLoading || !text.trim() || over || todayCount >= planLimit ? "#9bbcf7" : "#0a6cff",
-color: "#fff",
-display: "grid",
-placeItems: "center",
-cursor:
-isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "pointer",
-}}
+  onClick={handleSend}
+  disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
+  title={over ? "文字数が多すぎます" : "送信"}
+  style={{
+    width: 44,
+    height: 44,
+    borderRadius: "999px",
+    border: "none",
+    // ← ボタンの背景色が青い円になります（有効/無効で色分け）
+    background:
+      isLoading || !text.trim() || over || todayCount >= planLimit ? "#9bbcf7" : "#0a6cff",
+    color: "#fff",
+    display: "grid",
+    placeItems: "center",
+    cursor:
+      isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "pointer",
+  }}
 >
-{/* 青い円に白い三角形（送信アイコン） */}
-<svg
-  width="28"
-  height="28"
-  viewBox="0 0 24 24"
-  xmlns="http://www.w3.org/2000/svg"
->
-  <circle cx="12" cy="12" r="12" fill="#0a6cff" />
-  <polygon points="8,6 18,12 8,18" fill="white" />
-</svg>
+  {/* ⬇️ SVGは白い三角だけ（青い <circle> は削除） */}
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <polygon points="8,6 18,12 8,18" fill="white" />
+  </svg>
 </button>
 </div>
 
