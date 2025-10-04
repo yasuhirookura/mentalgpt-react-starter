@@ -258,10 +258,10 @@ isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "
   viewBox="0 0 24 24"
   xmlns="http://www.w3.org/2000/svg"
 >
-  {/* 青い円をやや大きく・中央に */}
+  {/* 大きな青い円 */}
   <circle cx="12" cy="12" r="12" fill="#0a6cff" />
-  
-  {/* 白い三角を円の中で大きく表示（右寄りに配置） */}
+
+  {/* 中央に右向きの白い三角形 */}
   <polygon points="8,6 18,12 8,18" fill="white" />
 </svg>
 </button>
