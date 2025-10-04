@@ -253,14 +253,16 @@ isLoading || !text.trim() || over || todayCount >= planLimit ? "not-allowed" : "
 >
 {/* 青い円に白い三角形（送信アイコン） */}
 <svg
-  width="22"
-  height="22"
+  width="26"
+  height="26"
   viewBox="0 0 24 24"
-  fill="white"
   xmlns="http://www.w3.org/2000/svg"
 >
-  <circle cx="12" cy="12" r="11" fill="#0a6cff" />
-  <polygon points="9,7 17,12 9,17" fill="white" />
+  {/* 青い円をやや大きく・中央に */}
+  <circle cx="12" cy="12" r="12" fill="#0a6cff" />
+  
+  {/* 白い三角を円の中で大きく表示（右寄りに配置） */}
+  <polygon points="8,6 18,12 8,18" fill="white" />
 </svg>
 </button>
 </div>
