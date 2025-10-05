@@ -17,7 +17,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
-  "proxy": "https://mentalgpt-react-starter-9c6nk7xui-yasuhirookuras-projects.vercel.app",
+  "proxy": "https://mentalgpt.okulab.com",
   "browserslist": {
     "production": [
       ">0.2%",
