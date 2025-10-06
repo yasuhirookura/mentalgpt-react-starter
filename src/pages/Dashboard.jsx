@@ -235,20 +235,27 @@ fontSize: 16,
 />
 
 <button
-  type="button"
   onClick={handleSend}
   disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
   title={over ? "文字数が多すぎます" : "送信"}
-  className="send-button"     // ← ここだけにする（styleは消す）
+  className="sendButton"                         // ← これを追加
+  style={{
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
+    border: "none",
+    background: "transparent",                   // ← ここは透明のまま
+    display: "grid",
+    placeItems: "center",
+    cursor:
+      isLoading || !text.trim() || over || todayCount >= planLimit
+        ? "not-allowed"
+        : "pointer",
+  }}
 >
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    {/* 背景の青い円はCSSが担当するので描かない */}
-    <polygon points="9,6 18,12 9,18" fill="white" />
+  <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="23" fill="#0a6cff" />
+    <polygon points="18,12 36,24 18,36" fill="white" />
   </svg>
 </button>
 </div>

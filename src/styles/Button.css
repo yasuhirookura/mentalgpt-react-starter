@@ -1,30 +1,22 @@
-/* 送信ボタンの共通デザイン */
-.send-button {
-  width: 52px;
-  height: 52px;
-  border: none;
-  border-radius: 50%;
-  background-color: #0a6cff;           /* 通常 */
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: background-color .2s ease, transform .15s ease;
+/* 共通（フォーカス枠をきれいに） */
+.sendButton {
+  outline: none;
 }
 
-/* hover（有効時のみ） */
-.send-button:not(:disabled):hover {
-  background-color: #005ae0;
-  transform: scale(1.05);
+/* ホバー時（有効なときのみ） */
+.sendButton:not(:disabled):hover svg circle {
+  filter: brightness(0.9);           /* 少し濃く見える */
+  transition: filter 120ms ease;
 }
 
-/* disabled */
-.send-button:disabled {
-  background-color: #9bbcf7;
+/* 押下時 */
+.sendButton:not(:disabled):active svg circle {
+  transform: translateY(1px);
+  transition: transform 40ms ease;
+}
+
+/* 無効時は薄く＆ポインター無効（補強） */
+.sendButton:disabled {
   cursor: not-allowed;
-}
-
-/* 中の三角が少しだけ持ち上がる（お好みで） */
-.send-button:not(:disabled):hover svg {
-  transform: translateY(-1px);
-  transition: transform .15s ease;
+  opacity: 0.6;
 }
