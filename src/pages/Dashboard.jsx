@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
+import "../styles/Button.css";
 
 const MAX = 400;
 const HINTS = [
@@ -234,33 +235,20 @@ fontSize: 16,
 />
 
 <button
+  type="button"
   onClick={handleSend}
   disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
   title={over ? "文字数が多すぎます" : "送信"}
-  style={{
-    width: 52,
-    height: 52,
-    borderRadius: "50%",
-    border: "none",
-    background: "transparent", // 👈 背景を透明にする（青の二重防止）
-    display: "grid",
-    placeItems: "center",
-    cursor:
-      isLoading || !text.trim() || over || todayCount >= planLimit
-        ? "not-allowed"
-        : "pointer",
-  }}
+  className="send-button"     // ← ここだけにする（styleは消す）
 >
   <svg
-    width="48"
-    height="48"
-    viewBox="0 0 48 48"
+    width="28"
+    height="28"
+    viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
   >
-    {/* 青い円 */}
-    <circle cx="24" cy="24" r="23" fill="#0a6cff" />
-    {/* 白い三角形（大きく中央配置） */}
-    <polygon points="18,12 36,24 18,36" fill="white" />
+    {/* 背景の青い円はCSSが担当するので描かない */}
+    <polygon points="9,6 18,12 9,18" fill="white" />
   </svg>
 </button>
 </div>
