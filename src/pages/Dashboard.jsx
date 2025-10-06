@@ -235,26 +235,15 @@ fontSize: 16,
 />
 
 <button
+  type="button"
+  aria-label="送信"
   onClick={handleSend}
   disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
   title={over ? "文字数が多すぎます" : "送信"}
-  className="sendButton"                         // ← これを追加
-  style={{
-    width: 52,
-    height: 52,
-    borderRadius: "50%",
-    border: "none",
-    background: "transparent",                   // ← ここは透明のまま
-    display: "grid",
-    placeItems: "center",
-    cursor:
-      isLoading || !text.trim() || over || todayCount >= planLimit
-        ? "not-allowed"
-        : "pointer",
-  }}
+  className="sendButton"
 >
   <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="24" cy="24" r="23" fill="#0a6cff" />
+    <circle cx="24" cy="24" r="23" />
     <polygon points="18,12 36,24 18,36" fill="white" />
   </svg>
 </button>
