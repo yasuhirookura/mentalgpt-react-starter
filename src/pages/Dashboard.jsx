@@ -1,8 +1,8 @@
 // src/pages/Dashboard.jsx
+import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
-import "../styles/Button.css";
 
 const MAX = 400;
 const HINTS = [
