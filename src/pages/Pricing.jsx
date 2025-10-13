@@ -11,11 +11,11 @@ export default function Pricing() {
     return h === "localhost" || h === "127.0.0.1";
   }, []);
 
-  async function handleSubscribe(plan) {
-    if (loadingPlan) return;
-    setError("");
-    setLoadingPlan(plan);
-    try {
+  // 変更点：handleSubscribe 内の最初で選択プランを保存
+async function handleSubscribe(plan) {
+  // 👇 仮のプラン保存（簡易版）。明日以降はWebhookで置き換え。
+  try { localStorage.setItem("plan", plan); } catch {}
+  
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
