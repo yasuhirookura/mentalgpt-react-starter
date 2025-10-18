@@ -106,7 +106,7 @@ style={{ marginTop: 8 }}
 onClick={() => handleSubscribe("light")}
 disabled={!!loadingPlan}
 >
-{loadingPlan === "light" ? "処理中…" : "ライトを申し込む（¥980/月）"}
+{loadingPlan === "light" ? "処理中…" : "ライトプランを申し込む（¥980/月）"}
 </button>
 </section>
 
@@ -134,7 +134,7 @@ onClick={() => handleSubscribe("standard")}
 disabled={!!loadingPlan}
 title="すぐに課金が開始されます"
 >
-{loadingPlan === "standard" ? "処理中…" : "スタンダードを申し込む（¥1,980/月）"}
+{loadingPlan === "standard" ? "処理中…" : "スタンダードプランを申し込む（¥1,980/月）"}
 </button>
 </section>
 
