@@ -128,7 +128,7 @@ borderRadius: 8,
 
 <button
 type="button"
-className="btn outline"
+className="btn primary"
 style={{ marginTop: 8 }}
 onClick={() => handleSubscribe("standard")}
 disabled={!!loadingPlan}
