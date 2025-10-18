@@ -102,7 +102,7 @@ borderRadius: 8,
 <button
 type="button"
 className="btn primary"
-style={{ marginTop: 8 }}
+style={{ marginTop: 8, fontSize: "1.1rem", fontWeight: 600, padding: "10px 18px" }}
 onClick={() => handleSubscribe("light")}
 disabled={!!loadingPlan}
 >
@@ -129,7 +129,7 @@ borderRadius: 8,
 <button
 type="button"
 className="btn primary"
-style={{ marginTop: 8 }}
+style={{ marginTop: 8, fontSize: "1.1rem", fontWeight: 600, padding: "10px 18px" }}
 onClick={() => handleSubscribe("standard")}
 disabled={!!loadingPlan}
 title="すぐに課金が開始されます"
