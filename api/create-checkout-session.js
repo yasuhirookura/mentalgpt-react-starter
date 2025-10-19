@@ -45,9 +45,9 @@ module.exports = async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
 
-      // 戻り先
-      success_url: `${baseUrl}/pricing?success=1`,
-      cancel_url: `${baseUrl}/pricing?canceled=1`,
+      // api/create-checkout-session.js の一部
+      success_url: `${SITE_BASE_URL}/welcome?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${SITE_BASE_URL}/pricing?canceled=1`,
 
       // ライトのときだけトライアル付与
       subscription_data: trialDays ? { trial_period_days: trialDays } : undefined,
