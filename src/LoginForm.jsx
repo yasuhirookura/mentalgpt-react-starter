@@ -64,7 +64,8 @@ export default function LoginForm() {
     <div className="auth-wrap">
       <div className="auth-card">
         <h1 className="brand">
-          <span className="muted">あなたの心にやさしく寄り添う</span><br/>
+          <span className="muted">あなたの心にやさしく寄り添う</span>
+          <br />
           <span className="brand-strong">MentalGPT</span>
           <span className="muted"> powered by ChatGPT</span>
           <span className="beta"> β版</span>
@@ -99,6 +100,19 @@ export default function LoginForm() {
             {loading ? "処理中…" : "ログイン"}
           </button>
         </form>
+
+        {/* 🔽 ここを追加（パスワードリセットリンク） */}
+        <p style={{ textAlign: "center", marginTop: "12px" }}>
+          <a
+            href="/reset-password"
+            style={{
+              color: "#007bff",
+              textDecoration: "none",
+            }}
+          >
+            パスワードをお忘れですか？
+          </a>
+        </p>
       </div>
     </div>
   );
