@@ -22,7 +22,7 @@ import SiteFooter from "./components/SiteFooter";
 // 課金フロー関連
 import Welcome from "./pages/Welcome";            // 決済後のパスワード設定案内
 import Account from "./pages/Account";            // マイアカウント（プラン/請求）
-import ProtectedRoute from "./components/ProtectedRoute"; // 認証ガード
+import ProtectedRoute from "./components/ProtectedRoute.jsx"; // 認証ガード
 import ResetPassword from "./pages/ResetPassword";        // パスワード再発行
 
 function App() {
