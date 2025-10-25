@@ -102,17 +102,9 @@ export default function LoginForm() {
         </form>
 
         {/* 🔽 ここを追加（パスワードリセットリンク） */}
-        <p style={{ textAlign: "center", marginTop: "12px" }}>
-          <a
-            href="/reset-password"
-            style={{
-              color: "#007bff",
-              textDecoration: "none",
-            }}
-          >
-            パスワードをお忘れですか？
-          </a>
-        </p>
+        <p className="reset-link">
+  <a href="/reset-password">パスワードをお忘れですか？</a>
+</p>
       </div>
     </div>
   );

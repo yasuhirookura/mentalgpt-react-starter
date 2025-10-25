@@ -30,11 +30,12 @@
   font-weight: 800;
   letter-spacing: .2px;
 }
+/* β版バッジを少し大きく＆見やすく */
 .brand .beta {
   display: inline-block;
   margin-left: 8px;
-  padding: 2px 8px;
-  font-size: 12px;
+  padding: 3px 10px;   /* 2→3 / 8→10 */
+  font-size: 14px;     /* 12→14 */
   font-weight: 700;
   color: #0a6cff;
   background: #e9f2ff;
@@ -166,5 +167,21 @@
 }
 
 .muted-link:hover {
+  text-decoration: underline;
+}
+
+/* パスワードリセットリンク */
+.reset-link {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.reset-link a {
+  color: #0a6cff;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.reset-link a:hover {
   text-decoration: underline;
 }

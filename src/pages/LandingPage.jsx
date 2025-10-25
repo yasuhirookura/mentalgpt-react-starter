@@ -8,6 +8,20 @@ export default function LandingPage() {
       {/* ---------------- Hero Section ---------------- */}
       <section className="hero">
         <h1>MentalGPT</h1>
+        <span
+  style={{
+    display: 'inline-block',
+    background: '#e9f2ff',
+    color: '#0a6cff',
+    fontWeight: 700,
+    borderRadius: 8,
+    padding: '4px 10px',
+    marginTop: 8,
+    fontSize: 14
+  }}
+>
+  β版
+</span>
         <h2 className="hero-catch">
           あなたの心にやさしく寄り添う、AIメンタルサポート。
         </h2>
