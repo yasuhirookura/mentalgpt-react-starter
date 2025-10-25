@@ -20,7 +20,7 @@ export default function Account() {
 
         // サーバーへ問い合わせ（/api/account-summary）
         const r = await fetch("/api/account-summary", {
-          headers: { Authorization: Bearer ${idToken} },
+          headers: { Authorization: `Bearer ${idToken}` },
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j?.error || "failed");
