@@ -155,3 +155,16 @@
   .outline, .ghost { background: #0f131b; color: #e5e7eb; border-color: #2a2f3a; }
   .alert { background: #2a1d12; border-color: #7c2d12; color: #fdba74; }
 }
+
+/* --- ここから追記 --- */
+.muted-link {
+  font-size: 0.9rem;
+  color: #2563eb;
+  text-decoration: none;
+  float: right;
+  margin-top: 4px;
+}
+
+.muted-link:hover {
+  text-decoration: underline;
+}
