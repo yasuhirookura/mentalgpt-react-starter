@@ -1,21 +1,37 @@
-import React from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+// src/components/ProtectedRoute.jsx
+import React, { useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase';
 
-// ログイン済みユーザーしか見られないページを守るためのコンポーネント
 export default function ProtectedRoute({ children }) {
-const { currentUser, loading } = useAuth();
+const [checking, setChecking] = useState(true);
+const [signedIn, setSignedIn] = useState(false);
 
-// Firebase Auth の状態確認が終わっていなければ「少し待ってください」表示
-if (loading) {
-return <div style={{ textAlign: "center", marginTop: "40px" }}>読み込み中...</div>;
+useEffect(() => {
+const unsub = onAuthStateChanged(auth, (user) => {
+const ok = !!user;
+setSignedIn(ok);
+setChecking(false);
+
+if (!ok) {
+// 直前に見ようとしていたパスを保存（戻すため）
+const returnTo = window.location.pathname + window.location.search;
+localStorage.setItem('mgpt_return_to', returnTo);
+
+const next = encodeURIComponent(returnTo);
+window.location.replace(`/login?next=${next}`);
+}
+});
+return () => unsub();
+}, []);
+
+if (checking) {
+return (
+<div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+<p style={{ color: '#64748b' }}>確認中です…</p>
+</div>
+);
 }
 
-// 未ログインなら /login にリダイレクト
-if (!currentUser) {
-return <Navigate to={`/login?next=${encodeURIComponent(window.location.pathname)}`} />;
-}
-
-// 認証済みなら子コンポーネントをそのまま表示
-return children;
+return signedIn ? children : null;
 }
