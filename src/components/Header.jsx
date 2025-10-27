@@ -1,45 +1,62 @@
 // src/components/Header.jsx
 import React from "react";
-import { signOut } from "firebase/auth";
+import { Link, useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
+import { signOut } from "firebase/auth";
 
-export default function Header({ plan }) {
+export default function Header() {
+  const navigate = useNavigate();
+
+  // ログアウト処理
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      window.location.href = "/login"; // ログアウト後にログイン画面へ
-    } catch (e) {
-      console.error("ログアウト失敗:", e);
-      alert("ログアウトに失敗しました。時間をおいて再度お試しください。");
+      navigate("/"); // ログアウト後トップページへ
+    } catch (error) {
+      console.error("ログアウト失敗:", error);
+      alert("ログアウトに失敗しました。");
     }
   };
 
-  return (
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "12px 16px",
-        borderBottom: "1px solid #eee",
-      }}
-    >
-      {/* 左側ロゴ */}
-      <a href="/" style={{ fontWeight: "bold", fontSize: 20, textDecoration: "none", color: "#333" }}>
-        MentalGPT
-      </a>
+  // 現在ログイン中かを判定
+  const isLoggedIn = !!auth.currentUser;
 
-      {/* 右側アクション */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* プランが free または light の場合のみ「アップグレード」表示 */}
-        {(plan === "free" || plan === "light") && (
-          <a href="/pricing" className="btn secondary" style={{ textDecoration: "none" }}>
-            アップグレード
+  return (
+    <header className="site-header">
+      <div className="container header-inner">
+        <Link to="/" className="logo">
+          <strong>MentalGPT</strong>
+          <span className="beta">β版</span>
+        </Link>
+
+        <nav className="nav-links">
+          <Link to="/about">About</Link>
+          <Link to="/pricing">料金</Link>
+          <Link to="/faq">FAQ</Link>
+
+          {/* 📩 お問合せリンク */}
+          <a href="mailto:info@okulab.com" style={{ color: "#0a6cff" }}>
+            お問合せ
           </a>
-        )}
-        <button onClick={handleLogout} className="btn">
-          ログアウト
-        </button>
+
+          {/* 🔐 ログイン ⇄ ログアウト */}
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="link"
+              style={{
+                background: "none",
+                border: "none",
+                color: "#0a6cff",
+                cursor: "pointer",
+              }}
+            >
+              ログアウト
+            </button>
+          ) : (
+            <Link to="/login">ログイン</Link>
+          )}
+        </nav>
       </div>
     </header>
   );
