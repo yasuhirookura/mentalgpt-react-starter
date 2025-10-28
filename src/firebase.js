@@ -1,9 +1,9 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
 import {
-  initializeAuth,
-  indexedDBLocalPersistence,
-  browserLocalPersistence,
+initializeAuth,
+indexedDBLocalPersistence,
+browserLocalPersistence,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -17,14 +17,30 @@ const firebaseConfig = {
   measurementId: "G-E70WT63FH5"
 };
 
+//
+// ✅ Firebase 初期化
+//
 const app = initializeApp(firebaseConfig);
 
-// ← ここがポイント：initializeAuth で複数の永続化方式を指定
+//
+// ✅ 永続ログイン設定（ブラウザ再起動してもログイン保持）
+//
 export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+persistence: [indexedDBLocalPersistence, browserLocalPersistence],
 });
 
+//
+// ✅ Firestore（DB）
+//
 export const db = getFirestore(app);
 
-// “auth の初期化完了”を待つためのフック（任意）
-export const authReady = Promise.resolve();
+//
+// ✅ Auth 初期化完了を保証する Promise
+// → 起動直後の「一瞬ログアウト扱い」を防ぐ
+//
+export const authReady = new Promise((resolve) => {
+const unsubscribe = auth.onAuthStateChanged(() => {
+unsubscribe(); // 一度だけ実行
+resolve();
+});
+});

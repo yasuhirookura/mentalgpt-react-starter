@@ -2,8 +2,11 @@
 import "./App.css";
 import "./lib/windowApi"; // ← window.api をセット
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+// Firebase 初期化完了を待つ
+import { authReady } from "./firebase";
 
 // --- ページ ---
 import LandingPage from "./pages/LandingPage";
@@ -23,9 +26,29 @@ import SiteFooter from "./components/SiteFooter";
 import Welcome from "./pages/Welcome";            // 決済後のパスワード設定案内
 import Account from "./pages/Account";            // マイアカウント（プラン/請求）
 import ProtectedRoute from "./components/ProtectedRoute.jsx"; // 認証ガード
-import ResetPassword from "./pages/ResetPassword";        // パスワード再発行
+import ResetPassword from "./pages/ResetPassword";            // パスワード再発行
 
 function App() {
+  // 🔒 Auth 初期化待ち（永続ログインの安定化）
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    authReady.then(() => {
+      if (mounted) setReady(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  if (!ready) {
+    // 初回ロード時のチラつき防止用の簡易ローディング
+    return (
+      <div style={{ textAlign: "center", paddingTop: 120, fontSize: 16 }}>
+        🔄 読み込み中…
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -40,8 +63,8 @@ function App() {
 
         {/* 🔐 認証系 */}
         <Route path="/login" element={<LoginForm />} />
-        <Route path="/reset-password" element={<ResetPassword />} /> {/* パスワード再発行 */}
-        <Route path="/welcome" element={<Welcome />} />               {/* 決済→遷移 */}
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/welcome" element={<Welcome />} /> {/* 決済→遷移 */}
 
         {/* アプリ内ページ */}
         <Route path="/dashboard" element={<Dashboard />} />
