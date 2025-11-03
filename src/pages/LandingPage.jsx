@@ -68,7 +68,7 @@ export default function LandingPage() {
         {/* ---------------- CTA Buttons ---------------- */}
         <div className="cta-row">
           <Link to="/pricing" className="btn primary">
-            今すぐはじめる / 料金を見る
+            今すぐ始める / プランを選ぶ
           </Link>
           <Link to="/login" className="btn outline">
             ログイン
