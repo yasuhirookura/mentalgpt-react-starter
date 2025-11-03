@@ -39,13 +39,13 @@ export default function LandingPage() {
           style={{
             display: "inline-block",
             position: "relative",
-            background: "#fff8e5",
-            color: "#b05a00",
+            background: "#ffc0cb",
+            color: "#7a0030",
             fontWeight: "bold",
-            borderRadius: 12,
-            padding: "6px 14px",
-            marginBottom: 12,
-            fontSize: 15,
+            borderRadius: 14,
+            padding: "10px 18px",
+            marginBottom: 4, // ← 間を詰めた
+            fontSize: 16,
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
           }}
         >
@@ -58,15 +58,15 @@ export default function LandingPage() {
               transform: "translateX(-50%)",
               width: 0,
               height: 0,
-              borderLeft: "8px solid transparent",
-              borderRight: "8px solid transparent",
-              borderTop: "8px solid #fff8e5",
+              borderLeft: "10px solid transparent",
+              borderRight: "10px solid transparent",
+              borderTop: "8px solid #ffc0cb",
             }}
           />
         </div>
 
         {/* ---------------- CTA Buttons ---------------- */}
-        <div className="cta-row">
+        <div className="cta-row" style={{ marginTop: 4 }}>
           <Link to="/pricing" className="btn primary">
             今すぐ始める / プランを選ぶ
           </Link>
