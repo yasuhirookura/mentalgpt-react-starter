@@ -120,7 +120,7 @@ export default function Pricing() {
           onClick={() => handleSubscribe("light")}
           disabled={!!loadingPlan}
         >
-          {loadingPlan === "light" ? "処理中…" : "ライトプランを申し込む（¥980/月）"}
+          {loadingPlan === "light" ? "処理中…" : "ライトプランを申し込む（¥500/月）"}
         </button>
       </section>
 
@@ -141,7 +141,7 @@ export default function Pricing() {
           disabled={!!loadingPlan}
           title="すぐに課金が開始されます"
         >
-          {loadingPlan === "standard" ? "処理中…" : "スタンダードプランを申し込む（¥1,980/月）"}
+          {loadingPlan === "standard" ? "処理中…" : "スタンダードプランを申し込む（¥980/月）"}
         </button>
       </section>
 
