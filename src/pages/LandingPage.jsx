@@ -9,28 +9,61 @@ export default function LandingPage() {
       <section className="hero">
         <h1>MentalGPT</h1>
         <span
-  style={{
-    display: 'inline-block',
-    background: '#e9f2ff',
-    color: '#0a6cff',
-    fontWeight: 700,
-    borderRadius: 8,
-    padding: '4px 10px',
-    marginTop: 8,
-    fontSize: 14
-  }}
->
-  β版
-</span>
+          style={{
+            display: "inline-block",
+            background: "#e9f2ff",
+            color: "#0a6cff",
+            fontWeight: 700,
+            borderRadius: 8,
+            padding: "4px 10px",
+            marginTop: 8,
+            fontSize: 14,
+          }}
+        >
+          β版
+        </span>
+
         <h2 className="hero-catch">
           あなたの心にやさしく寄り添う、AIメンタルサポート。
         </h2>
+
         <p className="hero-sub">
           対話することで気持ちが整理でき、<br className="sp-only" />
           心がふわっと軽くなる。<br />
           メンタル相談にアレンジされたAIに、<br className="sp-only" />
           24時間いつでも相談できるサービスです。
         </p>
+
+        {/* ---------------- Free Trial Balloon ---------------- */}
+        <div
+          style={{
+            display: "inline-block",
+            position: "relative",
+            background: "#fff8e5",
+            color: "#b05a00",
+            fontWeight: "bold",
+            borderRadius: 12,
+            padding: "6px 14px",
+            marginBottom: 12,
+            fontSize: 15,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          }}
+        >
+          🎁 1週間無料体験！
+          <span
+            style={{
+              position: "absolute",
+              bottom: -8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 0,
+              height: 0,
+              borderLeft: "8px solid transparent",
+              borderRight: "8px solid transparent",
+              borderTop: "8px solid #fff8e5",
+            }}
+          />
+        </div>
 
         {/* ---------------- CTA Buttons ---------------- */}
         <div className="cta-row">

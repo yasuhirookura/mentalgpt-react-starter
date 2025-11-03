@@ -107,7 +107,7 @@ export default function Pricing() {
       {/* ライトプラン */}
       <section style={{ marginBottom: 32, padding: 16, border: "1px solid #ddd", borderRadius: 8 }}>
         <h2>ライトプラン</h2>
-        <p>月額 980円（税込）</p>
+        <p>月額 500円（税込）</p>
         <ul>
           <li>1日 最大10回の相談（各 400文字まで）</li>
           <li>履歴保存：30日</li>
@@ -127,7 +127,7 @@ export default function Pricing() {
       {/* スタンダードプラン */}
       <section style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8 }}>
         <h2>スタンダードプラン</h2>
-        <p>月額 1,980円（税込）</p>
+        <p>月額 980円（税込）</p>
         <ul>
           <li>1日 最大30回の相談（各 400文字まで）</li>
           <li>履歴保存：90日</li>
