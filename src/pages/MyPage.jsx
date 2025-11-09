@@ -10,6 +10,10 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  // 解約用の状態
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState("");
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setLoading(true);
@@ -34,6 +38,38 @@ export default function MyPage() {
     return () => unsub();
   }, []);
 
+  const handleCancelSubscription = async () => {
+    if (!user?.email) {
+      setCancelMsg("メールアドレスが取得できませんでした。ログインし直してお試しください。");
+      return;
+    }
+    setCancelLoading(true);
+    setCancelMsg("");
+    try {
+      const res = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "解約に失敗しました。");
+      }
+      if (data.message === "no active subscription") {
+        setCancelMsg("現在アクティブなご契約はありません。");
+      } else {
+        setCancelMsg("解約が完了しました。数分後に反映されます。");
+      }
+    } catch (e) {
+      console.error(e);
+      setCancelMsg(e.message);
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container" style={{ padding: "48px 16px" }}>
@@ -47,7 +83,9 @@ export default function MyPage() {
       <div className="container" style={{ padding: "48px 16px" }}>
         <h1>マイページ</h1>
         <p>ログインが必要です。</p>
-        <a className="btn" href="/login">ログインへ</a>
+        <a className="btn" href="/login">
+          ログインへ
+        </a>
       </div>
     );
   }
@@ -126,12 +164,32 @@ export default function MyPage() {
         </Row>
         <Row label="次回請求日">準備中（決済システム連携後に自動表示）</Row>
 
-        <div className="actions">
+        <div className="actions" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button className="btn" onClick={handleManagePlan}>
             プランを確認・変更する
           </button>
+          {/* 解約ボタンをここに追加 */}
+          <button
+            onClick={handleCancelSubscription}
+            disabled={cancelLoading}
+            style={{
+              background: "#fff",
+              border: "1px solid #d00",
+              color: "#d00",
+              padding: "0.4rem 0.8rem",
+              borderRadius: 6,
+              cursor: cancelLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {cancelLoading ? "解約処理中…" : "解約する"}
+          </button>
         </div>
-        <p className="note">
+        {cancelMsg && (
+          <p style={{ marginTop: 8, color: "#444" }}>
+            {cancelMsg}
+          </p>
+        )}
+        <p className="note" style={{ marginTop: 8 }}>
           ※ デビットカードをご利用の方は、更新日前後の残高にご注意ください。
         </p>
       </section>
@@ -184,7 +242,11 @@ function formatDate(tsOrIso) {
     else if (typeof tsOrIso === "string") d = new Date(tsOrIso);
     else if (tsOrIso) d = new Date(tsOrIso);
     else return "—";
-    return d.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+    return d.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   } catch {
     return "—";
   }
@@ -193,9 +255,9 @@ function formatDate(tsOrIso) {
 function toPlanLabel(code) {
   switch (code) {
     case "light":
-      return "ライト（¥980/月）";
+      return "ライト（¥500/月）";
     case "standard":
-      return "スタンダード（¥1,980/月）";
+      return "スタンダード（¥980/月）";
     case "trial":
       return "トライアル（1週間無料）";
     case "free":
