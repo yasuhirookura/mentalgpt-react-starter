@@ -1,70 +1,68 @@
-// api/cancel-subscription.js
-const Stripe = require("stripe");
+// /api/cancel-subscription.js
+const Stripe = require('stripe');
+const admin = require('firebase-admin');
+
+// Vercel/Nodeで複数回初期化しないためのおまじない
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
+const db = admin.firestore();
+
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 module.exports = async (req, res) => {
-  // 簡単なヘルスチェック（GETで開いたとき用）
-  if (req.method === "GET") {
-    return res.status(200).json({ ok: true, time: new Date().toISOString() });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: 'email is required' });
   }
 
   try {
-    const { STRIPE_SECRET_KEY } = process.env;
-    if (!STRIPE_SECRET_KEY) {
-      throw new Error("STRIPE_SECRET_KEY is missing");
+    // 1) email から Firestore の users を探す
+    const snap = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (snap.empty) {
+      return res.status(404).json({ error: 'user not found' });
     }
-    const stripe = Stripe(STRIPE_SECRET_KEY);
+    const userDoc = snap.docs[0];
+    const userData = userDoc.data();
 
-    // フロントから送ってもらう
-    const { email } = req.body || {};
-    if (!email) {
-      return res.status(400).json({ error: "email is required" });
-    }
+    // Firestoreにはさっき手で入れてたやつ
+    const subscriptionId = userData.subscriptionId;
+    const stripeCustomerId = userData.stripeCustomerId;
 
-    // 1) このメールのCustomerをStripeから探す
-    const customers = await stripe.customers.list({
-      email,
-      limit: 1,
-    });
-
-    if (!customers.data.length) {
-      return res.status(404).json({ error: "customer not found" });
-    }
-
-    const customer = customers.data[0];
-
-    // 2) そのCustomerの有効なサブスクリプションを取る
-    const subs = await stripe.subscriptions.list({
-      customer: customer.id,
-      status: "active", // “trialing” も含めたいときは配列で
-      expand: ["data.default_payment_method"],
-      limit: 1,
-    });
-
-    if (!subs.data.length) {
-      // ここに来る＝もう解約済み or もともと契約してない
-      return res.status(200).json({ ok: true, message: "no active subscription" });
+    // 2) Stripe側も止める（サブスクがある場合だけ）
+    if (subscriptionId) {
+      await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: true,
+      });
+    } else if (stripeCustomerId) {
+      // subscriptionId がない場合でも一応探す
+      const subs = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: 'active',
+        limit: 1,
+      });
+      if (subs.data[0]) {
+        await stripe.subscriptions.update(subs.data[0].id, {
+          cancel_at_period_end: true,
+        });
+      }
     }
 
-    const sub = subs.data[0];
-
-    // 3) 今回は「すぐ止める」方式にします
-    const canceled = await stripe.subscriptions.update(sub.id, {
-      cancel_at_period_end: false, // trueにすると今月いっぱいで止まる
+    // 3) Firestoreにも「解約希望」を記録
+    await userDoc.ref.update({
+      cancelRequested: true,
+      cancelRequestedAt: new Date().toISOString(),
     });
 
-    return res.status(200).json({
-      ok: true,
-      subscription_id: canceled.id,
-      status: canceled.status,
-    });
+    return res.status(200).json({ ok: true, message: 'cancel scheduled' });
   } catch (err) {
-    console.error("[cancel-subscription] error:", err);
-    return res
-      .status(500)
-      .json({ error: err.message || "internal error in cancel-subscription" });
+    console.error('[cancel-subscription] error:', err);
+    return res.status(500).json({ error: 'internal error' });
   }
 };
