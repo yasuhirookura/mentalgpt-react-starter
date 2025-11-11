@@ -88,9 +88,7 @@ export default function MyPage() {
   // 表示整形
   const email = user.email ?? "(メール未設定)";
   const emailVerified = !!user.emailVerified;
-  const joinedAt = uDoc?.joinedAt
-  ? formatDate(uDoc.joinedAt)
-  : "（表示準備中）";
+  const joinedAt = uDoc?.joinedAt ? formatDate(uDoc.joinedAt) : "（表示準備中）";
   const supportId = uDoc?.supportDisplayId ?? "（準備中）";
 
   const plan = uDoc?.plan ?? "free"; // "trial" | "light" | "standard" | "free"
