@@ -89,7 +89,7 @@ export default function MyPage() {
   const email = user.email ?? "(メール未設定)";
   const emailVerified = !!user.emailVerified;
   const joinedAt = formatDate(uDoc?.joinedAt);
-  const supportId = uDoc?.supportDisplayId ?? "—";
+  const supportId = uDoc?.supportDisplayId ?? "（準備中）";
 
   const plan = uDoc?.plan ?? "free"; // "trial" | "light" | "standard" | "free"
   const planLabel = toPlanLabel(plan);
@@ -157,7 +157,7 @@ export default function MyPage() {
         <Row label="保存期間">
           {plan === "standard" ? "90日（+7日グレース）" : "30日（+7日グレース）"}
         </Row>
-        <Row label="次回請求日">準備中（決済システム連携後に自動表示）</Row>
+        <Row label="次回請求日">（自動表示に対応予定）</Row>
 
         <div
           className="actions"
@@ -214,7 +214,7 @@ export default function MyPage() {
             </button>
             {!canExportCsv && (
               <span className="note" style={{ marginLeft: 12 }}>
-                （スタンダード向け機能）
+                CSVをダウンロード（近日公開予定）
               </span>
             )}
           </>
