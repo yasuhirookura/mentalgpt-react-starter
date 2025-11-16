@@ -24,43 +24,76 @@ module.exports = async (req, res) => {
 
   try {
     // 1) email から Firestore の users を探す
-    const snap = await db.collection('users').where('email', '==', email).limit(1).get();
+    const snap = await db
+      .collection('users')
+      .where('email', '==', email)
+      .limit(1)
+      .get();
+
     if (snap.empty) {
-      return res.status(404).json({ error: 'user not found' });
+      // ユーザー自体が見つからない場合は「アクティブな契約なし扱い」
+      return res.status(200).json({
+        ok: true,
+        status: 'no_user_in_firestore',
+        message: 'no active subscription',
+      });
     }
+
     const userDoc = snap.docs[0];
     const userData = userDoc.data();
 
-    // Firestoreにはさっき手で入れてたやつ
     const subscriptionId = userData.subscriptionId;
     const stripeCustomerId = userData.stripeCustomerId;
 
-    // 2) Stripe側も止める（サブスクがある場合だけ）
+    let canceled = false;
+
+    // 2) subscriptionId があればそれを優先して止める
     if (subscriptionId) {
       await stripe.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
       });
+      canceled = true;
     } else if (stripeCustomerId) {
-      // subscriptionId がない場合でも一応探す
+      // 3) subscriptionId がなくても、customer から trialing/active を探す
       const subs = await stripe.subscriptions.list({
         customer: stripeCustomerId,
-        status: 'active',
-        limit: 1,
+        status: 'all', // active だけでなく trialing も含めて取得
+        limit: 10,
       });
-      if (subs.data[0]) {
-        await stripe.subscriptions.update(subs.data[0].id, {
+
+      const target = subs.data.find(
+        (s) => s.status === 'active' || s.status === 'trialing'
+      );
+
+      if (target) {
+        await stripe.subscriptions.update(target.id, {
           cancel_at_period_end: true,
         });
+        canceled = true;
       }
     }
 
-    // 3) Firestoreにも「解約希望」を記録
+    // 4) Firestoreにも「解約希望」を記録（ログ用）
     await userDoc.ref.update({
       cancelRequested: true,
       cancelRequestedAt: new Date().toISOString(),
+      lastCancelStatus: canceled ? 'cancel_at_period_end' : 'no_active_subscription',
     });
 
-    return res.status(200).json({ ok: true, message: 'cancel scheduled' });
+    // 5) フロント用のステータスを返す
+    if (!canceled) {
+      return res.status(200).json({
+        ok: true,
+        status: 'no_active_subscription',
+        message: 'no active subscription',
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      status: 'cancel_scheduled',
+      message: 'cancel scheduled at period end',
+    });
   } catch (err) {
     console.error('[cancel-subscription] error:', err);
     return res.status(500).json({ error: 'internal error' });
