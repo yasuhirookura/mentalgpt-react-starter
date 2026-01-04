@@ -1,37 +1,37 @@
 // src/components/ProtectedRoute.jsx
-import React, { useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebase';
+import { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase";
 
 export default function ProtectedRoute({ children }) {
-const [checking, setChecking] = useState(true);
-const [signedIn, setSignedIn] = useState(false);
+  const [user, setUser] = useState(undefined); // undefined = 判定中
+  const location = useLocation();
 
-useEffect(() => {
-const unsub = onAuthStateChanged(auth, (user) => {
-const ok = !!user;
-setSignedIn(ok);
-setChecking(false);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u); // u は user or null
+    });
+    return () => unsub();
+  }, []);
 
-if (!ok) {
-// 直前に見ようとしていたパスを保存（戻すため）
-const returnTo = window.location.pathname + window.location.search;
-localStorage.setItem('mgpt_return_to', returnTo);
+  // 🔄 判定中（Auth復元待ち）
+  if (user === undefined) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <p style={{ color: "#64748b" }}>確認中です…</p>
+      </div>
+    );
+  }
 
-const next = encodeURIComponent(returnTo);
-window.location.replace(`/login?next=${next}`);
-}
-});
-return () => unsub();
-}, []);
+  // 🚫 未ログイン
+  if (!user) {
+    const returnTo = location.pathname + location.search;
+    localStorage.setItem("mgpt_return_to", returnTo);
 
-if (checking) {
-return (
-<div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
-<p style={{ color: '#64748b' }}>確認中です…</p>
-</div>
-);
-}
+    return <Navigate to={`/login?next=${encodeURIComponent(returnTo)}`} replace />;
+  }
 
-return signedIn ? children : null;
+  // ✅ ログイン済み
+  return children;
 }
