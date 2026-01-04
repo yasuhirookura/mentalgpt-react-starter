@@ -3,6 +3,7 @@ import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
+import { auth } from "../firebase";
 
 const MAX = 400;
 const HINTS = [
@@ -76,9 +77,15 @@ export default function Dashboard() {
     setTimeout(() => scrollToBottom(false), 0);
 
     try {
+      const u = auth.currentUser;
+      const idToken = u ? await u.getIdToken() : null;
+
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+         "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
         body: JSON.stringify({ message: body }),
       });
 
