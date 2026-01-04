@@ -72,8 +72,33 @@ export default function Dashboard() {
       content: body,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMsg]);
-    incrementUsage(); // ← JST基準で投稿回数を加算
+    try {
+  const u = auth.currentUser;
+  const idToken = u ? await u.getIdToken() : null;
+
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    body: JSON.stringify({ message: body }),
+  });
+
+  if (!res.ok) throw new Error(`POST /api/chat failed: ${res.status}`);
+
+  const data = await res.json();
+
+  // ✅ 成功したので、ここで回数を加算
+  incrementUsage();
+
+  const aiMsg = {
+    id: `ai_${Date.now()}`,
+    role: "ai",
+    content: data.text ?? data.content ?? "(応答なし)",
+    createdAt: new Date().toISOString(),
+  };
+  setMessages((prev) => [...prev, aiMsg]);
     setTimeout(() => scrollToBottom(false), 0);
 
     try {
