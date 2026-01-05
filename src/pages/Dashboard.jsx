@@ -55,7 +55,7 @@ export default function Dashboard() {
   if (body.length > MAX) return;
   if (isLoading) return;
 
-  // 軽ガード
+  // 軽ガード（ローカル回数）
   if (todayCount >= planLimit) {
     alert("本日の上限に達しました。明日またご利用ください。");
     return;
@@ -65,9 +65,9 @@ export default function Dashboard() {
   setText("");
   localStorage.setItem("draft", "");
 
-  // ✅ まずユーザー発言を表示（ここでは回数は減らさない）
+  // 先にユーザー発言は表示（これはOK）
   const userMsg = {
-    id: `u_${Date.now()}`,
+    id: `user_${Date.now()}`,
     role: "user",
     content: body,
     createdAt: new Date().toISOString(),
@@ -88,15 +88,14 @@ export default function Dashboard() {
       body: JSON.stringify({ message: body }),
     });
 
-    // 失敗時はここで落とす（→ catch に行く）ので回数は減らない
+    const data = await res.json().catch(() => ({}));
+
     if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`POST /api/chat failed: ${res.status} ${detail}`);
+      // 失敗ならカウントしない
+      throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
     }
 
-    const data = await res.json();
-
-    // ✅ 成功したので、ここで回数を加算（＝残り回数を減らす）
+    // ✅ 成功したので、ここで回数を加算（ここがポイント）
     incrementUsage();
 
     const aiMsg = {
