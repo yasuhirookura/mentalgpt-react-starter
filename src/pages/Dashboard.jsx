@@ -50,97 +50,79 @@ export default function Dashboard() {
   };
 
   async function handleSend() {
-    const body = text.trim();
-    if (!body) return;
-    if (body.length > MAX) return;
-    if (isLoading) return;
+  const body = text.trim();
+  if (!body) return;
+  if (body.length > MAX) return;
+  if (isLoading) return;
 
-    // 軽ガード
-    if (todayCount >= planLimit) {
-      alert("本日の上限に達しました。明日またご利用ください。");
-      return;
-    }
+  // 軽ガード
+  if (todayCount >= planLimit) {
+    alert("本日の上限に達しました。明日またご利用ください。");
+    return;
+  }
 
-    setIsLoading(true);
-    setText("");
-    localStorage.setItem("draft", "");
+  setIsLoading(true);
+  setText("");
+  localStorage.setItem("draft", "");
 
-    const tempId = `temp_${Date.now()}`;
-    const userMsg = {
-      id: tempId,
-      role: "user",
-      content: body,
-      createdAt: new Date().toISOString(),
-    };
-    try {
-  const u = auth.currentUser;
-  const idToken = u ? await u.getIdToken() : null;
-
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-    },
-    body: JSON.stringify({ message: body }),
-  });
-
-  if (!res.ok) throw new Error(`POST /api/chat failed: ${res.status}`);
-
-  const data = await res.json();
-
-  // ✅ 成功したので、ここで回数を加算
-  incrementUsage();
-
-  const aiMsg = {
-    id: `ai_${Date.now()}`,
-    role: "ai",
-    content: data.text ?? data.content ?? "(応答なし)",
+  // ✅ まずユーザー発言を表示（ここでは回数は減らさない）
+  const userMsg = {
+    id: `u_${Date.now()}`,
+    role: "user",
+    content: body,
     createdAt: new Date().toISOString(),
   };
-  setMessages((prev) => [...prev, aiMsg]);
-    setTimeout(() => scrollToBottom(false), 0);
+  setMessages((prev) => [...prev, userMsg]);
+  setTimeout(() => scrollToBottom(false), 0);
 
-    try {
-      const u = auth.currentUser;
-      const idToken = u ? await u.getIdToken() : null;
+  try {
+    const u = auth.currentUser;
+    const idToken = u ? await u.getIdToken() : null;
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-         "Content-Type": "application/json",
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
         ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        body: JSON.stringify({ message: body }),
-      });
+      },
+      body: JSON.stringify({ message: body }),
+    });
 
-      if (!res.ok) throw new Error(`POST /api/chat failed: ${res.status}`);
-
-      const data = await res.json();
-      const aiMsg = {
-        id: `ai_${Date.now()}`,
-        role: "ai",
-        content: data.text ?? data.content ?? "(応答なし)",
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setTimeout(() => scrollToBottom(), 0);
-    } catch (e) {
-      console.error("[send] error", e);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          role: "system",
-          content: "送信に失敗しました。もう一度お試しください。",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      setTimeout(() => scrollToBottom(), 0);
-    } finally {
-      setIsLoading(false);
+    // 失敗時はここで落とす（→ catch に行く）ので回数は減らない
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`POST /api/chat failed: ${res.status} ${detail}`);
     }
+
+    const data = await res.json();
+
+    // ✅ 成功したので、ここで回数を加算（＝残り回数を減らす）
+    incrementUsage();
+
+    const aiMsg = {
+      id: `ai_${Date.now()}`,
+      role: "ai",
+      content: data.text ?? data.content ?? "(応答なし)",
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, aiMsg]);
+    setTimeout(() => scrollToBottom(), 0);
+  } catch (e) {
+    console.error("[send] error", e);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `err_${Date.now()}`,
+        role: "system",
+        content: "送信に失敗しました。もう一度お試しください。",
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setTimeout(() => scrollToBottom(), 0);
+  } finally {
+    setIsLoading(false);
   }
+}
 
   function scrollToBottom(smooth = true) {
     const el = endRef.current;
