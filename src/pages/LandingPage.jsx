@@ -75,6 +75,10 @@ export default function LandingPage() {
           </Link>
         </div>
 
+        <p className="cta-subnote">
+  1週間使ってみて、「今の自分には特に大きな悩みがない」と気づけた、という声もあります。
+</p>
+
         <p className="mini-note">
           ※本サービスは医療行為ではありません（診断・治療は行いません）。<br />
           ※AI応答は OpenAI の API（ChatGPT）を利用しています。
