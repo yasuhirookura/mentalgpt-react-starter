@@ -208,7 +208,7 @@ export default function Dashboard() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="いまの気持ちを自由に書いてください（400文字まで）"
+            placeholder="今の気分や、頭に浮かんだことを、自由にどうぞ（400文字まで）"
             minRows={2}
             maxRows={10}
             style={{
