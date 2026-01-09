@@ -1,7 +1,7 @@
 // src/pages/MyPage.jsx
 import React, { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 export default function MyPage() {
@@ -10,7 +10,7 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // 解約用（今回の追加分）
+  // 解約用
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMsg, setCancelMsg] = useState("");
 
@@ -38,28 +38,46 @@ export default function MyPage() {
     return () => unsub();
   }, []);
 
-  // 🔴 解約リクエストを Firestore に立てるだけのやつ
+  // ✅ Stripe自動解約APIを叩く版
   const handleCancelSubscription = async () => {
-    if (!user?.uid) {
-      setCancelMsg("ユーザー情報が取得できませんでした。ログインし直してお試しください。");
+    if (!user?.email) {
+      setCancelMsg("メールアドレスが取得できませんでした。ログインし直してお試しください。");
       return;
     }
+
+    const ok = window.confirm(
+      "現在のサブスクリプションを解約します。\n次回以降の請求が停止されます。よろしいですか？"
+    );
+    if (!ok) return;
+
     setCancelLoading(true);
     setCancelMsg("");
+
     try {
-      const ref = doc(db, "users", user.uid);
-      await setDoc(
-        ref,
-        {
-          cancelRequested: true,
-          cancelRequestedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      setCancelMsg("解約リクエストを受け付けました。運営側で処理します。");
+      const res = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = data.error || "解約に失敗しました。時間をおいて再度お試しください。";
+        throw new Error(msg);
+      }
+
+      if (
+        data.status === "no_active_subscription" ||
+        data.status === "no_user_in_firestore"
+      ) {
+        setCancelMsg("現在アクティブなご契約はありません。");
+      } else {
+        setCancelMsg("解約手続きを受け付けました。次回請求分から停止されます。");
+      }
     } catch (e) {
       console.error(e);
-      setCancelMsg("解約リクエストの登録に失敗しました。時間をおいてもう一度お試しください。");
+      setCancelMsg(e.message || "解約処理中にエラーが発生しました。");
     } finally {
       setCancelLoading(false);
     }
@@ -101,7 +119,9 @@ export default function MyPage() {
   const canExportCsv = plan === "standard"; // MVP：スタンダードで解放
 
   const handleExportCsv = async () => {
-    alert("CSV出力は準備中です（スタンダード向け）。リリース後、/api/export からダウンロードできるようにします。");
+    alert(
+      "CSV出力は準備中です（スタンダード向け）。リリース後、/api/export からダウンロードできるようにします。"
+    );
   };
 
   const handleManagePlan = () => {
@@ -161,7 +181,12 @@ export default function MyPage() {
 
         <div
           className="actions"
-          style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
         >
           <button className="btn" onClick={handleManagePlan}>
             プランを確認・変更する
@@ -198,7 +223,8 @@ export default function MyPage() {
         <h2>データ</h2>
         <Row label="保存履歴">
           <>
-            直近の履歴は <a href="/dashboard">投稿画面</a> 下部に表示されます。<br />
+            直近の履歴は <a href="/dashboard">投稿画面</a> 下部に表示されます。
+            <br />
             過去の履歴は <a href="/archive">アーカイブ</a> で閲覧・復元できます。
           </>
         </Row>
