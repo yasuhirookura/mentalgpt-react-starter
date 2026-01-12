@@ -109,7 +109,7 @@ borderBottom: "8px solid #ccc",
 
 <p className="mini-note">
 ※本サービスは医療行為ではありません（診断・治療は行いません）。<br />
-※AI応答は OpenAI の API（ChatGPT）を利用し、MentalGPTにあわせてアレンジしています。
+※AI応答は OpenAI の API（ChatGPT）を活用し、MentalGPTにあわせてアレンジしています。
 </p>
 </section>
 
