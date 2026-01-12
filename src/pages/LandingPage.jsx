@@ -49,7 +49,7 @@ export default function LandingPage() {
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
           }}
         >
-          🎁 1週間無料体験！
+          1週間無料体験！
           <span
             style={{
               position: "absolute",
