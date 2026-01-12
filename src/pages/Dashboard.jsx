@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [planLimit, setPlanLimit] = useState(10);
   const [usageDate, setUsageDate] = useState(""); // "YYYY-MM-DD" (JST)
   const [userEmail, setUserEmail] = useState("");
+  const [userUid, setUserUid] = useState(""); // ← これを追加
 
   const endRef = useRef(null);
 
