@@ -187,20 +187,16 @@ export default function Dashboard() {
   return (
     <main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "8px 0 4px" }}>
-        <h1 style={{ margin: 0 }}>投稿</h1>
+  <h1 style={{ margin: 0 }}>投稿</h1>
 
-        <span style={{ fontSize: 13, color: "#666" }}>
-          今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
-          {usageDate ?  / ${usageDate} : ""}
-        </span>
+  <span style={{ fontSize: 11, color: "#999" }}>
+    uid: {userUid || "(未取得)"}
+  </span>
 
-        <span style={{ marginLeft: "auto", fontSize: 13 }}>
-          <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
-          {userEmail ? (
-            <span style={{ marginLeft: 10, color: "#999" }}>({userEmail})</span>
-          ) : null}
-        </span>
-      </header>
+  <span style={{ marginLeft: "auto", fontSize: 13 }}>
+    <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
+  </span>
+</header>
 
       <div
         style={{
