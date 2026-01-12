@@ -39,7 +39,7 @@ export default function LandingPage() {
           style={{
             display: "inline-block",
             position: "relative",
-            background: "#ffc0cb",
+            background: "#ffff00",
             color: "#7a0030",
             fontWeight: "bold",
             borderRadius: 14,
@@ -60,7 +60,7 @@ export default function LandingPage() {
               height: 0,
               borderLeft: "10px solid transparent",
               borderRight: "10px solid transparent",
-              borderTop: "8px solid #ffc0cb",
+              borderTop: "8px solid #ffff00",
             }}
           />
         </div>
