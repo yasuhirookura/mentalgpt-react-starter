@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
 import { auth } from "../firebase";
 
@@ -14,41 +14,72 @@ const HINTS = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   const [text, setText] = useState(localStorage.getItem("draft") || "");
   const [isLoading, setIsLoading] = useState(false);
   const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
   const [messages, setMessages] = useState([]);
   const [pageCount, setPageCount] = useState(30);
 
-  // ✅ サーバー由来の回数（ブラウザ依存を排除）
+  // ✅ サーバー由来の回数（ブラウザ非依存）
   const [todayCount, setTodayCount] = useState(0);
   const [planLimit, setPlanLimit] = useState(10);
 
   const endRef = useRef(null);
-  const scrollWrapRef = useRef(null);
 
-  // 初回：usage をサーバーから取得
-  useEffect(() => {
-    (async () => {
-      try {
-        const u = auth.currentUser;
-        const idToken = u ? await u.getIdToken() : null;
-        if (!idToken) return;
+  function scrollToBottom(smooth = true) {
+    const el = endRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+  }
 
-        const res = await fetch("/api/usage", {
-          method: "GET",
-          headers: { Authorization: Bearer ${idToken} },
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.usage) {
-          setTodayCount(data.usage.usedToday ?? 0);
-          setPlanLimit(data.usage.dailyLimit ?? 10);
-        }
-      } catch (e) {
-        console.error("[usage] fetch error", e);
+  // ✅ サーバーから usage を取得
+  async function fetchUsage() {
+    const u = auth.currentUser;
+    if (!u) return;
+
+    const idToken = await u.getIdToken(true);
+
+    const res = await fetch("/api/usage", {
+      method: "GET",
+      headers: {
+        ...(idToken ? { Authorization: Bearer ${idToken} } : {}),
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // 401なら未ログイン/トークン切れ
+      if (res.status === 401) {
+        navigate("/login");
+        return;
       }
-    })();
+      console.error("[usage] failed", res.status, data);
+      return;
+    }
+
+    // 期待: { usedToday, dailyLimit, date }
+    setTodayCount(Number(data.usedToday || 0));
+    setPlanLimit(Number(data.dailyLimit || 10));
+  }
+
+  // 初回：ログイン済みなら usage 取得
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      if (!u) {
+        navigate("/login");
+        return;
+      }
+      await fetchUsage();
+    });
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("draft", text);
+  }, [text]);
 
   async function handleSend() {
     const body = text.trim();
@@ -56,7 +87,7 @@ export default function Dashboard() {
     if (body.length > MAX) return;
     if (isLoading) return;
 
-    // UIガード（最終判定はサーバー）
+    // ✅ UI側もサーバー値でガード（最終判定はサーバーがする）
     if (todayCount >= planLimit) {
       alert("本日の上限に達しました。明日またご利用ください。");
       return;
@@ -66,6 +97,7 @@ export default function Dashboard() {
     setText("");
     localStorage.setItem("draft", "");
 
+    // ユーザー発言は先に表示
     const userMsg = {
       id: `user_${Date.now()}`,
       role: "user",
@@ -77,7 +109,11 @@ export default function Dashboard() {
 
     try {
       const u = auth.currentUser;
-      const idToken = u ? await u.getIdToken() : null;
+      if (!u) {
+        navigate("/login");
+        return;
+      }
+      const idToken = await u.getIdToken(true);
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -90,33 +126,24 @@ export default function Dashboard() {
 
       const data = await res.json().catch(() => ({}));
 
-      // ❗429（日次上限）はここで確定
-      if (res.status === 429) {
-        // サーバーの数値で表示を同期
-        if (data?.dailyLimit != null) setPlanLimit(data.dailyLimit);
-        if (data?.usedToday != null) setTodayCount(data.usedToday);
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `limit_${Date.now()}`,
-            role: "system",
-            content: data?.message || "本日の上限に達しました。明日またお待ちしています。",
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        setTimeout(() => scrollToBottom(), 0);
-        return;
-      }
-
       if (!res.ok) {
+        // サーバーが429返したら、その値をUIに反映
+        if (res.status === 429 && data?.dailyLimit != null) {
+          setTodayCount(Number(data.usedToday || planLimit));
+          setPlanLimit(Number(data.dailyLimit || planLimit));
+          alert(data.message || "本日の上限に達しました。");
+          return;
+        }
         throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
       }
 
-      // ✅ サーバーから返ってきた usage で、表示を完全同期（ここがキモ）
+      // ✅ 成功したら、サーバーが返した usage をそのまま反映
       if (data?.usage) {
-        setTodayCount(data.usage.usedToday ?? todayCount);
-        setPlanLimit(data.usage.dailyLimit ?? planLimit);
+        setTodayCount(Number(data.usage.usedToday || 0));
+        setPlanLimit(Number(data.usage.dailyLimit || 10));
+      } else {
+        // 念のため（usage が無い場合は取りに行く）
+        await fetchUsage();
       }
 
       const aiMsg = {
@@ -144,20 +171,6 @@ export default function Dashboard() {
     }
   }
 
-  function scrollToBottom(smooth = true) {
-    const el = endRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-  }
-
-  function onKeyDown(e) {
-    // Enter送信無効（必要ならCtrl+Enter送信に）
-  }
-
-  useEffect(() => {
-    localStorage.setItem("draft", text);
-  }, [text]);
-
   const visibleMessages = messages.slice(-pageCount);
   const over = text.length > MAX;
   const remain = Math.max(planLimit - todayCount, 0);
@@ -175,7 +188,6 @@ export default function Dashboard() {
       </header>
 
       <div
-        ref={scrollWrapRef}
         style={{
           border: "1px solid #e5e7eb",
           borderRadius: 12,
@@ -228,7 +240,6 @@ export default function Dashboard() {
           <TextareaAutosize
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
             placeholder="今の気分や、頭に浮かんだことを、自由にどうぞ（400文字まで）"
             minRows={2}
             maxRows={10}
@@ -273,7 +284,13 @@ export default function Dashboard() {
 function MessageBubble({ role, content, createdAt }) {
   const isUser = role === "user";
   return (
-    <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+        margin: "8px 0",
+      }}
+    >
       <div
         style={{
           background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
