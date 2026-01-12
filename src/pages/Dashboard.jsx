@@ -1,20 +1,9 @@
 // src/pages/Dashboard.jsx
 import "../styles/Button.css";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
-import { auth, db } from "../firebase";
-
-// Firestore
-import {
-  addDoc,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from "firebase/firestore";
+import { auth, authReady } from "../firebase";
 
 const MAX = 400;
 const HINTS = [
@@ -27,97 +16,57 @@ const HINTS = [
 export default function Dashboard() {
   const [text, setText] = useState(localStorage.getItem("draft") || "");
   const [isLoading, setIsLoading] = useState(false);
-  const hint = useMemo(() => HINTS[Math.floor(Math.random() * HINTS.length)], []);
+  const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
   const [messages, setMessages] = useState([]);
+  const [pageCount, setPageCount] = useState(30);
 
-  // ✅ サーバー（Firestore）基準の回数
+  // ✅ サーバー由来の利用状況
   const [todayCount, setTodayCount] = useState(0);
   const [planLimit, setPlanLimit] = useState(10);
+  const [usageDate, setUsageDate] = useState(""); // "YYYY-MM-DD"
 
   const endRef = useRef(null);
   const scrollWrapRef = useRef(null);
 
-  const over = text.length > MAX;
-  const remain = Math.max(planLimit - todayCount, 0);
+  // 起動時：Auth準備 → /api/usage でサーバーの回数を取得
+  useEffect(() => {
+    let mounted = true;
 
-  function scrollToBottom(smooth = true) {
-    const el = endRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-  }
+    (async () => {
+      try {
+        await authReady;
+        const u = auth.currentUser;
+        if (!u) return;
 
-  // 下書き保存
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/usage", {
+          method: "GET",
+          headers: {
+            ...(idToken ? { Authorization: Bearer ${idToken} } : {}),
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!mounted) return;
+
+        if (res.ok && data?.usage) {
+          setTodayCount(Number(data.usage.usedToday || 0));
+          setPlanLimit(Number(data.usage.dailyLimit || 10));
+          setUsageDate(String(data.usage.date || ""));
+        }
+      } catch (e) {
+        // usage取得失敗は致命的ではないので黙ってOK（必要ならconsole出す）
+        console.warn("[usage] fetch failed", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("draft", text);
   }, [text]);
-
-  // ✅ サーバー側 usage を取得（ブラウザを変えても同じ値になる）
-  async function fetchUsage() {
-    const u = auth.currentUser;
-    const idToken = u ? await u.getIdToken() : null;
-    if (!idToken) return;
-
-    const res = await fetch("/api/usage", {
-      method: "GET",
-      headers: { Authorization: Bearer ${idToken} },
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return;
-
-    const usedToday = data?.usage?.usedToday ?? 0;
-    const dailyLimit = data?.usage?.dailyLimit ?? 10;
-    setTodayCount(usedToday);
-    setPlanLimit(dailyLimit);
-  }
-
-  // ✅ 履歴：Firestoreから購読（ブラウザを変えても同じ会話が出る）
-  useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) return;
-
-    // まず usage 取得
-    fetchUsage();
-
-    // messages 購読
-    const ref = collection(db, "users", u.uid, "messages");
-    const q = query(ref, orderBy("createdAt", "asc"), limit(300));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const rows = snap.docs.map((d) => {
-          const v = d.data();
-          return {
-            id: d.id,
-            role: v.role || "system",
-            content: v.content || "",
-            createdAt: v.createdAt?.toDate?.()?.toISOString?.() || "",
-          };
-        });
-        setMessages(rows);
-        setTimeout(() => scrollToBottom(false), 0);
-      },
-      (err) => {
-        console.error("[firestore] onSnapshot error", err);
-      }
-    );
-
-    return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ✅ Firestoreに1件保存
-  async function saveMessageToFirestore(role, content) {
-    const u = auth.currentUser;
-    if (!u) return;
-
-    const ref = collection(db, "users", u.uid, "messages");
-    await addDoc(ref, {
-      role,
-      content,
-      createdAt: serverTimestamp(),
-    });
-  }
 
   async function handleSend() {
     const body = text.trim();
@@ -125,7 +74,7 @@ export default function Dashboard() {
     if (body.length > MAX) return;
     if (isLoading) return;
 
-    // ✅ サーバー基準で上限チェック（表示もサーバー基準）
+    // ✅ 表示上のガード（最終判定はサーバーの 429）
     if (todayCount >= planLimit) {
       alert("本日の上限に達しました。明日またご利用ください。");
       return;
@@ -135,64 +84,105 @@ export default function Dashboard() {
     setText("");
     localStorage.setItem("draft", "");
 
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      role: "user",
+      content: body,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setTimeout(() => scrollToBottom(false), 0);
+
     try {
+      await authReady;
       const u = auth.currentUser;
       const idToken = u ? await u.getIdToken() : null;
-      if (!idToken) {
-        await saveMessageToFirestore("system", "ログイン情報を確認できませんでした。再ログインしてください。");
-        return;
-      }
-
-      // 先にユーザー発言をFirestoreへ（＝履歴が残る）
-      await saveMessageToFirestore("user", body);
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+          ...(idToken ? { Authorization: Bearer ${idToken} } : {}),
         },
         body: JSON.stringify({ message: body }),
       });
 
       const data = await res.json().catch(() => ({}));
 
+      // 429 / 401 / 500 など
       if (!res.ok) {
-        // 429（上限）など
-        if (res.status === 429) {
-          const msg =
-            data?.message ||
-            "本日の上限に達しました。明日またお待ちしています。";
-          await saveMessageToFirestore("system", msg);
-          // usageを取り直して表示を揃える
-          await fetchUsage();
+        // 429（日次上限）はメッセージを分けて表示
+        if (res.status === 429 && data?.error === "daily_limit") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `limit_${Date.now()}`,
+              role: "system",
+              content:
+                data?.message ||
+                "本日の上限に達しました。明日またお待ちしています。",
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+
+          // 可能なら usage を反映
+          if (data?.dailyLimit != null) setPlanLimit(Number(data.dailyLimit));
+          if (data?.usedToday != null) setTodayCount(Number(data.usedToday));
+          if (data?.date) setUsageDate(String(data.date));
+
+          setTimeout(() => scrollToBottom(), 0);
           return;
         }
 
         throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
       }
 
-      const aiText = data?.text ?? data?.content ?? "（応答なし）";
-      await saveMessageToFirestore("ai", aiText);
+      // ✅ 成功：サーバーの usage をそのまま採用（ブラウザ依存ゼロ）
+      if (data?.usage) {
+        setTodayCount(Number(data.usage.usedToday || 0));
+        setPlanLimit(Number(data.usage.dailyLimit || 10));
+        setUsageDate(String(data.usage.date || ""));
+      }
 
-      // ✅ /api/chat が返す usage で、表示の回数を即一致させる
-      const usedToday = data?.usage?.usedToday;
-      const dailyLimit = data?.usage?.dailyLimit;
-      if (typeof usedToday === "number") setTodayCount(usedToday);
-      if (typeof dailyLimit === "number") setPlanLimit(dailyLimit);
-
+      const aiMsg = {
+        id: `ai_${Date.now()}`,
+        role: "ai",
+        content: data.text ?? data.content ?? "(応答なし)",
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
       setTimeout(() => scrollToBottom(), 0);
     } catch (e) {
       console.error("[send] error", e);
-      await saveMessageToFirestore("system", "送信に失敗しました。もう一度お試しください。");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err_${Date.now()}`,
+          role: "system",
+          content: "送信に失敗しました。もう一度お試しください。",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setTimeout(() => scrollToBottom(), 0);
     } finally {
       setIsLoading(false);
     }
   }
 
-  function onKeyDown(e) {
-    // Enter送信を有効にしたい場合はここで制御（今は無効のまま）
+  function scrollToBottom(smooth = true) {
+    const el = endRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }
+
+  function onKeyDown(e) {
+    // 必要なら Ctrl+Enter 送信などに
+    // if ((e.ctrlKey || e.metaKey) && e.key === "Enter") handleSend();
+  }
+
+  const visibleMessages = messages.slice(-pageCount);
+  const over = text.length > MAX;
+  const remain = Math.max(planLimit - todayCount, 0);
 
   return (
     <main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
@@ -200,6 +190,7 @@ export default function Dashboard() {
         <h1 style={{ margin: 0 }}>投稿</h1>
         <span style={{ fontSize: 13, color: "#666" }}>
           今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
+          {usageDate ? <span style={{ marginLeft: 8 }}>[{usageDate}]</span> : null}
         </span>
         <span style={{ marginLeft: "auto", fontSize: 13 }}>
           <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
@@ -223,15 +214,23 @@ export default function Dashboard() {
       >
         <div style={{ flexGrow: 1 }} />
 
-        {messages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <p style={{ color: "#888", textAlign: "center", margin: "12px 0" }}>
             ここに会話が表示されます。下の入力欄から気持ちを書いてみてください。
           </p>
         )}
 
-        {messages.map((m) => (
+        {visibleMessages.map((m) => (
           <MessageBubble key={m.id} role={m.role} content={m.content} createdAt={m.createdAt} />
         ))}
+
+        {messages.length > pageCount && (
+          <div style={{ textAlign: "center", margin: "12px 0 8px" }}>
+            <button className="btn btn-outline" onClick={() => setPageCount((c) => c + 20)}>
+              もっと見る
+            </button>
+          </div>
+        )}
 
         <div ref={endRef} />
       </div>
@@ -328,7 +327,6 @@ function MessageBubble({ role, content, createdAt }) {
 /* ------ util ------ */
 function formatTime(ts) {
   try {
-    if (!ts) return "";
     const d = new Date(ts);
     return d.toLocaleString("ja-JP");
   } catch {
