@@ -13,115 +13,136 @@ const HINTS = [
   "少しだけお待ちください…",
 ];
 
-// 🇯🇵 JSTで今日の日付文字列を生成（例: "2025-10-28"）
-function getJstDateString() {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const jst = new Date(utc + 9 * 60 * 60000);
-  return jst.toISOString().split("T")[0];
-}
-
 export default function Dashboard() {
   const [text, setText] = useState(localStorage.getItem("draft") || "");
   const [isLoading, setIsLoading] = useState(false);
   const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
   const [messages, setMessages] = useState([]);
   const [pageCount, setPageCount] = useState(30);
+
+  // ✅ サーバー由来の回数（ブラウザ依存を排除）
   const [todayCount, setTodayCount] = useState(0);
   const [planLimit, setPlanLimit] = useState(10);
+
   const endRef = useRef(null);
   const scrollWrapRef = useRef(null);
 
-  // 📅 1日投稿回数を JST で管理
+  // 初回：usage をサーバーから取得
   useEffect(() => {
-    const todayKey = getJstDateString();
-    const saved = JSON.parse(localStorage.getItem("usage") || "{}");
-    const count = saved[todayKey] || 0;
-    setTodayCount(count);
+    (async () => {
+      try {
+        const u = auth.currentUser;
+        const idToken = u ? await u.getIdToken() : null;
+        if (!idToken) return;
+
+        const res = await fetch("/api/usage", {
+          method: "GET",
+          headers: { Authorization: Bearer ${idToken} },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.usage) {
+          setTodayCount(data.usage.usedToday ?? 0);
+          setPlanLimit(data.usage.dailyLimit ?? 10);
+        }
+      } catch (e) {
+        console.error("[usage] fetch error", e);
+      }
+    })();
   }, []);
 
-  // ✅ 投稿時に count +1 & JST日付で保存
-  const incrementUsage = () => {
-    const todayKey = getJstDateString();
-    const saved = JSON.parse(localStorage.getItem("usage") || "{}");
-    saved[todayKey] = (saved[todayKey] || 0) + 1;
-    localStorage.setItem("usage", JSON.stringify(saved));
-    setTodayCount(saved[todayKey]);
-  };
-
   async function handleSend() {
-  const body = text.trim();
-  if (!body) return;
-  if (body.length > MAX) return;
-  if (isLoading) return;
+    const body = text.trim();
+    if (!body) return;
+    if (body.length > MAX) return;
+    if (isLoading) return;
 
-  // 軽ガード（ローカル回数）
-  if (todayCount >= planLimit) {
-    alert("本日の上限に達しました。明日またご利用ください。");
-    return;
-  }
-
-  setIsLoading(true);
-  setText("");
-  localStorage.setItem("draft", "");
-
-  // 先にユーザー発言は表示（これはOK）
-  const userMsg = {
-    id: `user_${Date.now()}`,
-    role: "user",
-    content: body,
-    createdAt: new Date().toISOString(),
-  };
-  setMessages((prev) => [...prev, userMsg]);
-  setTimeout(() => scrollToBottom(false), 0);
-
-  try {
-    const u = auth.currentUser;
-    const idToken = u ? await u.getIdToken() : null;
-
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-      },
-      body: JSON.stringify({ message: body }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      // 失敗ならカウントしない
-      throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
+    // UIガード（最終判定はサーバー）
+    if (todayCount >= planLimit) {
+      alert("本日の上限に達しました。明日またご利用ください。");
+      return;
     }
 
-    // ✅ 成功したので、ここで回数を加算（ここがポイント）
-    incrementUsage();
+    setIsLoading(true);
+    setText("");
+    localStorage.setItem("draft", "");
 
-    const aiMsg = {
-      id: `ai_${Date.now()}`,
-      role: "ai",
-      content: data.text ?? data.content ?? "(応答なし)",
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      role: "user",
+      content: body,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, aiMsg]);
-    setTimeout(() => scrollToBottom(), 0);
-  } catch (e) {
-    console.error("[send] error", e);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `err_${Date.now()}`,
-        role: "system",
-        content: "送信に失敗しました。もう一度お試しください。",
+    setMessages((prev) => [...prev, userMsg]);
+    setTimeout(() => scrollToBottom(false), 0);
+
+    try {
+      const u = auth.currentUser;
+      const idToken = u ? await u.getIdToken() : null;
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: Bearer ${idToken} } : {}),
+        },
+        body: JSON.stringify({ message: body }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      // ❗429（日次上限）はここで確定
+      if (res.status === 429) {
+        // サーバーの数値で表示を同期
+        if (data?.dailyLimit != null) setPlanLimit(data.dailyLimit);
+        if (data?.usedToday != null) setTodayCount(data.usedToday);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `limit_${Date.now()}`,
+            role: "system",
+            content: data?.message || "本日の上限に達しました。明日またお待ちしています。",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+        setTimeout(() => scrollToBottom(), 0);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
+      }
+
+      // ✅ サーバーから返ってきた usage で、表示を完全同期（ここがキモ）
+      if (data?.usage) {
+        setTodayCount(data.usage.usedToday ?? todayCount);
+        setPlanLimit(data.usage.dailyLimit ?? planLimit);
+      }
+
+      const aiMsg = {
+        id: `ai_${Date.now()}`,
+        role: "ai",
+        content: data.text ?? data.content ?? "(応答なし)",
         createdAt: new Date().toISOString(),
-      },
-    ]);
-    setTimeout(() => scrollToBottom(), 0);
-  } finally {
-    setIsLoading(false);
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setTimeout(() => scrollToBottom(), 0);
+    } catch (e) {
+      console.error("[send] error", e);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err_${Date.now()}`,
+          role: "system",
+          content: "送信に失敗しました。もう一度お試しください。",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setTimeout(() => scrollToBottom(), 0);
+    } finally {
+      setIsLoading(false);
+    }
   }
-}
 
   function scrollToBottom(smooth = true) {
     const el = endRef.current;
@@ -252,13 +273,7 @@ export default function Dashboard() {
 function MessageBubble({ role, content, createdAt }) {
   const isUser = role === "user";
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: isUser ? "flex-end" : "flex-start",
-        margin: "8px 0",
-      }}
-    >
+    <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
       <div
         style={{
           background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
@@ -280,7 +295,6 @@ function MessageBubble({ role, content, createdAt }) {
   );
 }
 
-/* ------ util ------ */
 function formatTime(ts) {
   try {
     const d = new Date(ts);
