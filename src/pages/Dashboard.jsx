@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
 import { auth } from "../firebase";
 
@@ -14,32 +14,40 @@ const HINTS = [
 ];
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-
   const [text, setText] = useState(localStorage.getItem("draft") || "");
   const [isLoading, setIsLoading] = useState(false);
   const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
   const [messages, setMessages] = useState([]);
   const [pageCount, setPageCount] = useState(30);
 
-  // ✅ サーバー由来の回数（ブラウザ非依存）
+  // ✅ サーバー（Firestore）由来の使用回数
   const [todayCount, setTodayCount] = useState(0);
   const [planLimit, setPlanLimit] = useState(10);
+  const [usageDate, setUsageDate] = useState(""); // "YYYY-MM-DD" (JST)
 
   const endRef = useRef(null);
 
+  // --- util ---
   function scrollToBottom(smooth = true) {
     const el = endRef.current;
     if (!el) return;
     el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }
 
-  // ✅ サーバーから usage を取得
-  async function fetchUsage() {
-    const u = auth.currentUser;
-    if (!u) return;
+  function formatTime(ts) {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString("ja-JP");
+    } catch {
+      return "";
+    }
+  }
 
-    const idToken = await u.getIdToken(true);
+  // ✅ /api/usage からサーバーの回数を取得（起動時＆ログイン状態変化時）
+  async function fetchUsageFromServer() {
+    const u = auth.currentUser;
+    if (!u) return; // 未ログインなら何もしない（UI側でログイン導線へ）
+    const idToken = await u.getIdToken();
 
     const res = await fetch("/api/usage", {
       method: "GET",
@@ -49,29 +57,23 @@ export default function Dashboard() {
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      // 401なら未ログイン/トークン切れ
-      if (res.status === 401) {
-        navigate("/login");
-        return;
-      }
-      console.error("[usage] failed", res.status, data);
-      return;
-    }
+    if (!res.ok) throw new Error(data?.error || `GET /api/usage failed: ${res.status}`);
 
-    // 期待: { usedToday, dailyLimit, date }
-    setTodayCount(Number(data.usedToday || 0));
-    setPlanLimit(Number(data.dailyLimit || 10));
+    const usage = data?.usage;
+    if (usage) {
+      setTodayCount(Number(usage.usedToday || 0));
+      setPlanLimit(Number(usage.dailyLimit || 10));
+      setUsageDate(String(usage.date || ""));
+    }
   }
 
-  // 初回：ログイン済みなら usage 取得
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async (u) => {
-      if (!u) {
-        navigate("/login");
-        return;
-      }
-      await fetchUsage();
+    // 初回
+    fetchUsageFromServer().catch((e) => console.error("[usage] init error", e));
+
+    // Firebaseログイン状態の変化でも更新
+    const unsub = auth.onAuthStateChanged(() => {
+      fetchUsageFromServer().catch((e) => console.error("[usage] auth changed error", e));
     });
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,7 +89,7 @@ export default function Dashboard() {
     if (body.length > MAX) return;
     if (isLoading) return;
 
-    // ✅ UI側もサーバー値でガード（最終判定はサーバーがする）
+    // ✅ サーバー値に基づく軽ガード（最終判定はサーバーの /api/chat 側）
     if (todayCount >= planLimit) {
       alert("本日の上限に達しました。明日またご利用ください。");
       return;
@@ -97,7 +99,7 @@ export default function Dashboard() {
     setText("");
     localStorage.setItem("draft", "");
 
-    // ユーザー発言は先に表示
+    // 先にユーザー発言は表示
     const userMsg = {
       id: `user_${Date.now()}`,
       role: "user",
@@ -109,11 +111,12 @@ export default function Dashboard() {
 
     try {
       const u = auth.currentUser;
-      if (!u) {
-        navigate("/login");
-        return;
+      const idToken = u ? await u.getIdToken() : null;
+
+      if (!idToken) {
+        // 未ログイン想定（UI的にはログイン導線があるので）
+        throw new Error("unauthorized");
       }
-      const idToken = await u.getIdToken(true);
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -127,48 +130,59 @@ export default function Dashboard() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // サーバーが429返したら、その値をUIに反映
-        if (res.status === 429 && data?.dailyLimit != null) {
-          setTodayCount(Number(data.usedToday || planLimit));
-          setPlanLimit(Number(data.dailyLimit || planLimit));
-          alert(data.message || "本日の上限に達しました。");
-          return;
-        }
-        throw new Error(data?.error || `POST /api/chat failed: ${res.status}`);
+        // 429(日次上限)などもここに入る
+        const msg =
+          data?.message ||
+          (data?.error === "daily_limit"
+            ? "本日の上限に達しました。明日またお待ちしています。"
+            : "送信に失敗しました。もう一度お試しください。");
+        throw new Error(msg);
       }
 
-      // ✅ 成功したら、サーバーが返した usage をそのまま反映
+      // ✅ ここが重要：サーバーが返す usage をそのまま反映（ブラウザ依存を断つ）
       if (data?.usage) {
         setTodayCount(Number(data.usage.usedToday || 0));
-        setPlanLimit(Number(data.usage.dailyLimit || 10));
+        setPlanLimit(Number(data.usage.dailyLimit || planLimit));
+        setUsageDate(String(data.usage.date || usageDate));
       } else {
-        // 念のため（usage が無い場合は取りに行く）
-        await fetchUsage();
+        // 念のため usage が無い場合は取りに行く
+        fetchUsageFromServer().catch(() => {});
       }
 
       const aiMsg = {
         id: `ai_${Date.now()}`,
         role: "ai",
-        content: data.text ?? data.content ?? "(応答なし)",
+        content: data.text ?? data.content ?? "（応答を取得できませんでした）",
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, aiMsg]);
       setTimeout(() => scrollToBottom(), 0);
     } catch (e) {
       console.error("[send] error", e);
+      const msg = String(e?.message || "");
+
       setMessages((prev) => [
         ...prev,
         {
           id: `err_${Date.now()}`,
           role: "system",
-          content: "送信に失敗しました。もう一度お試しください。",
+          content: msg.includes("上限")
+            ? msg
+            : "送信に失敗しました。もう一度お試しください。",
           createdAt: new Date().toISOString(),
         },
       ]);
       setTimeout(() => scrollToBottom(), 0);
+
+      // 失敗時も念のためサーバー値を再同期（別端末で進んでた等）
+      fetchUsageFromServer().catch(() => {});
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function onKeyDown(e) {
+    // Enter送信無効（必要なら Ctrl+Enter 送信などに変更可能）
   }
 
   const visibleMessages = messages.slice(-pageCount);
@@ -179,9 +193,12 @@ export default function Dashboard() {
     <main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "8px 0 4px" }}>
         <h1 style={{ margin: 0 }}>投稿</h1>
+
         <span style={{ fontSize: 13, color: "#666" }}>
           今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
+          {usageDate ? <span style={{ marginLeft: 8 }}>（JST: {usageDate}）</span> : null}
         </span>
+
         <span style={{ marginLeft: "auto", fontSize: 13 }}>
           <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
         </span>
@@ -240,6 +257,7 @@ export default function Dashboard() {
           <TextareaAutosize
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder="今の気分や、頭に浮かんだことを、自由にどうぞ（400文字まで）"
             minRows={2}
             maxRows={10}
@@ -278,45 +296,36 @@ export default function Dashboard() {
       </div>
     </main>
   );
-}
 
-/* ------ バブル ------ */
-function MessageBubble({ role, content, createdAt }) {
-  const isUser = role === "user";
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: isUser ? "flex-end" : "flex-start",
-        margin: "8px 0",
-      }}
-    >
+  /* ------ components ------ */
+  function MessageBubble({ role, content, createdAt }) {
+    const isUser = role === "user";
+    return (
       <div
         style={{
-          background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
-          border: "1px solid #e5e7eb",
-          padding: "10px 12px",
-          borderRadius: 12,
-          maxWidth: "85%",
-          lineHeight: 1.8,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
+          display: "flex",
+          justifyContent: isUser ? "flex-end" : "flex-start",
+          margin: "8px 0",
         }}
       >
-        <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-          {isUser ? "あなた" : role === "ai" ? "MentalGPT" : "システム"} ・ {formatTime(createdAt)}
+        <div
+          style={{
+            background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
+            border: "1px solid #e5e7eb",
+            padding: "10px 12px",
+            borderRadius: 12,
+            maxWidth: "85%",
+            lineHeight: 1.8,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+            {isUser ? "あなた" : role === "ai" ? "MentalGPT" : "システム"} ・ {formatTime(createdAt)}
+          </div>
+          <div>{content}</div>
         </div>
-        <div>{content}</div>
       </div>
-    </div>
-  );
-}
-
-function formatTime(ts) {
-  try {
-    const d = new Date(ts);
-    return d.toLocaleString("ja-JP");
-  } catch {
-    return "";
+    );
   }
 }
