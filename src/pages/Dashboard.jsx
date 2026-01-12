@@ -18,78 +18,46 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
   const [messages, setMessages] = useState([]);
+  const [pageCount, setPageCount] = useState(30);
 
-  // ✅ サーバ（Firestore）由来の回数表示
+  // ✅ サーバー基準の回数
   const [todayCount, setTodayCount] = useState(0);
   const [planLimit, setPlanLimit] = useState(10);
-  const [usageDate, setUsageDate] = useState(""); // "YYYY-MM-DD" (JST)
+
+  // ✅ 同一ユーザー確認用
+  const [userUid, setUserUid] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [userUid, setUserUid] = useState(""); // ← これを追加
 
   const endRef = useRef(null);
 
-  function scrollToBottom(smooth = true) {
-    const el = endRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-  }
-
-  async function getIdTokenOrNull() {
-    try {
-      await authReady; // 起動直後のズレ対策
-      const u = auth.currentUser;
-      if (!u) return null;
-      setUserEmail(u.email || "");
-      return await u.getIdToken();
-    } catch {
-      return null;
-    }
-  }
-
-  // ✅ サーバ側の usage を取得して表示に反映
-  async function refreshUsage() {
-    const idToken = await getIdTokenOrNull();
-    if (!idToken) return;
-
-    const res = await fetch("/api/usage", {
-      method: "GET",
-      headers: { Authorization: Bearer ${idToken} },
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.warn("[usage] failed", res.status, data);
-      return;
-    }
-
-    const u = data?.usage;
-    if (!u) return;
-
-    setTodayCount(typeof u.usedToday === "number" ? u.usedToday : 0);
-    setPlanLimit(typeof u.dailyLimit === "number" ? u.dailyLimit : 10);
-    setUsageDate(u.date || "");
-  }
-
-  // 初回 & タブ復帰時に usage を更新（他ブラウザ/他タブとのズレも吸収）
+  // 起動時：Auth確定 → uid/email 表示 → /api/usage でサーバーの回数を取得
   useEffect(() => {
-    refreshUsage();
+    (async () => {
+      await authReady;
 
-    const onFocus = () => refreshUsage();
-    window.addEventListener("focus", onFocus);
+      const u = auth.currentUser;
+      setUserUid(u?.uid || "");
+      setUserEmail(u?.email || "");
 
-    const onVis = () => {
-      if (document.visibilityState === "visible") refreshUsage();
-    };
-    document.addEventListener("visibilitychange", onVis);
+      if (!u) return;
 
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      try {
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/usage", {
+          method: "GET",
+          headers: { Authorization: Bearer ${idToken} },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.usage) {
+          setTodayCount(data.usage.usedToday ?? 0);
+          setPlanLimit(data.usage.dailyLimit ?? 10);
+        }
+      } catch (e) {
+        console.error("[usage] fetch error", e);
+      }
+    })();
   }, []);
 
-  // 下書き保存
   useEffect(() => {
     localStorage.setItem("draft", text);
   }, [text]);
@@ -100,7 +68,7 @@ export default function Dashboard() {
     if (body.length > MAX) return;
     if (isLoading) return;
 
-    // 表示上の軽ガード（最終判定はサーバが行う）
+    // 軽ガード（最終判定はサーバー）
     if (todayCount >= planLimit) {
       alert("本日の上限に達しました。明日またご利用ください。");
       return;
@@ -120,7 +88,12 @@ export default function Dashboard() {
     setTimeout(() => scrollToBottom(false), 0);
 
     try {
-      const idToken = await getIdTokenOrNull();
+      await authReady;
+      const u = auth.currentUser;
+      setUserUid(u?.uid || "");
+      setUserEmail(u?.email || "");
+
+      const idToken = u ? await u.getIdToken() : null;
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -134,13 +107,31 @@ export default function Dashboard() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // 429などもここで拾う
         const msg =
           data?.message ||
-          (data?.error === "daily_limit"
-            ? "本日の上限に達しました。明日またお待ちしています。"
-            : "送信に失敗しました。もう一度お試しください。");
+          (data?.error === "daily_limit" ? "本日の上限に達しました。" : "送信に失敗しました。");
         throw new Error(msg);
+      }
+
+      // ✅ サーバーが返した usage を採用（ブラウザを変えても一致するべき）
+      if (data?.usage) {
+        setTodayCount(data.usage.usedToday ?? todayCount);
+        setPlanLimit(data.usage.dailyLimit ?? planLimit);
+      } else {
+        // 万一 usage が返らない場合は /api/usage で再取得
+        try {
+          if (idToken) {
+            const r2 = await fetch("/api/usage", {
+              method: "GET",
+              headers: { Authorization: Bearer ${idToken} },
+            });
+            const d2 = await r2.json().catch(() => ({}));
+            if (r2.ok && d2?.usage) {
+              setTodayCount(d2.usage.usedToday ?? todayCount);
+              setPlanLimit(d2.usage.dailyLimit ?? planLimit);
+            }
+          }
+        } catch {}
       }
 
       const aiMsg = {
@@ -151,15 +142,6 @@ export default function Dashboard() {
       };
       setMessages((prev) => [...prev, aiMsg]);
       setTimeout(() => scrollToBottom(), 0);
-
-      // ✅ /api/chat が返してくれる usage を優先的に反映
-      const u = data?.usage;
-      if (u && typeof u.usedToday === "number") {
-        setTodayCount(u.usedToday);
-      } else {
-        // 念のため再取得
-        refreshUsage();
-      }
     } catch (e) {
       console.error("[send] error", e);
       setMessages((prev) => [
@@ -172,31 +154,43 @@ export default function Dashboard() {
         },
       ]);
       setTimeout(() => scrollToBottom(), 0);
-
-      // 失敗時も、表示だけはサーバ基準に戻す
-      refreshUsage();
     } finally {
       setIsLoading(false);
     }
   }
 
-  const visibleMessages = messages; // 必要ならページング戻せます
+  function scrollToBottom(smooth = true) {
+    const el = endRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+  }
+
+  function onKeyDown(e) {
+    // Enter送信無効（必要ならCtrl+Enter送信に）
+  }
+
+  const visibleMessages = messages.slice(-pageCount);
   const over = text.length > MAX;
   const remain = Math.max(planLimit - todayCount, 0);
 
   return (
     <main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "8px 0 4px" }}>
-  <h1 style={{ margin: 0 }}>投稿</h1>
+        <h1 style={{ margin: 0 }}>投稿</h1>
 
-  <span style={{ fontSize: 11, color: "#999" }}>
-    uid: {userUid || "(未取得)"}
-  </span>
+        <span style={{ fontSize: 13, color: "#666" }}>
+          今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
+        </span>
 
-  <span style={{ marginLeft: "auto", fontSize: 13 }}>
-    <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
-  </span>
-</header>
+        {/* ✅ uid/email 表示（Safari/Chromeで同一ユーザーか最短確認） */}
+        <span style={{ fontSize: 11, color: "#999", overflow: "hidden", textOverflow: "ellipsis" }}>
+          uid: {userUid || "(未取得)"} {userEmail ?  / ${userEmail} : ""}
+        </span>
+
+        <span style={{ marginLeft: "auto", fontSize: 13 }}>
+          <Link to="/mypage">マイページ</Link> / <Link to="/pricing">Pricing</Link>
+        </span>
+      </header>
 
       <div
         style={{
@@ -224,6 +218,14 @@ export default function Dashboard() {
           <MessageBubble key={m.id} role={m.role} content={m.content} createdAt={m.createdAt} />
         ))}
 
+        {messages.length > pageCount && (
+          <div style={{ textAlign: "center", margin: "12px 0 8px" }}>
+            <button className="btn btn-outline" onClick={() => setPageCount((c) => c + 20)}>
+              もっと見る
+            </button>
+          </div>
+        )}
+
         <div ref={endRef} />
       </div>
 
@@ -243,6 +245,7 @@ export default function Dashboard() {
           <TextareaAutosize
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder="今の気分や、頭に浮かんだことを、自由にどうぞ（400文字まで）"
             minRows={2}
             maxRows={10}
@@ -283,10 +286,17 @@ export default function Dashboard() {
   );
 }
 
+/* ------ バブル ------ */
 function MessageBubble({ role, content, createdAt }) {
   const isUser = role === "user";
   return (
-    <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+        margin: "8px 0",
+      }}
+    >
       <div
         style={{
           background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
@@ -308,6 +318,7 @@ function MessageBubble({ role, content, createdAt }) {
   );
 }
 
+/* ------ util ------ */
 function formatTime(ts) {
   try {
     const d = new Date(ts);
