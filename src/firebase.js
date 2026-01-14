@@ -1,7 +1,8 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
 import {
-  initializeAuth,
+  getAuth,
+  setPersistence,
   indexedDBLocalPersistence,
   browserLocalPersistence,
   onAuthStateChanged,
@@ -20,17 +21,29 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = initializeAuth(app, {
-  // iOS Safariなどで localStorage が不安定でも IndexedDB に逃げられる
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-});
-
+export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// 起動直後の「一瞬ログアウト扱い」を避けるため、Auth初期化を待つ
-export const authReady = new Promise((resolve) => {
-  const unsubscribe = onAuthStateChanged(auth, () => {
-    unsubscribe();
-    resolve();
+/**
+ * 🔐 Auth 永続化 & 初期化待ち
+ * - iOS Safariでタブが落ちても復元されやすい
+ * - 「一瞬ログアウト扱い」を防ぐ
+ */
+export const authReady = (async () => {
+  try {
+    // ① 永続化を明示的に指定（重要）
+    await setPersistence(auth, indexedDBLocalPersistence);
+  } catch (e) {
+    // IndexedDB がダメな場合の保険
+    console.warn("IndexedDB persistence failed, fallback to localStorage", e);
+    await setPersistence(auth, browserLocalPersistence);
+  }
+
+  // ② Firebase Auth の復元完了を待つ
+  await new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      unsubscribe();
+      resolve();
+    });
   });
-});
+})();
