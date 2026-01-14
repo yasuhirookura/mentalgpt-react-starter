@@ -1,37 +1,66 @@
 // src/components/ProtectedRoute.jsx
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, authReady } from "../firebase";
 
 export default function ProtectedRoute({ children }) {
-  const [user, setUser] = useState(undefined); // undefined = 判定中
+  const [checking, setChecking] = useState(true);
+  const [user, setUser] = useState(null);
   const location = useLocation();
 
+  // ✅ 復帰直後の「一瞬null」を吸収する猶予（ms）
+  const GRACE_MS = 1500;
+  const timerRef = useRef(null);
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u); // u は user or null
-    });
-    return () => unsub();
+    let unsub = null;
+    let mounted = true;
+
+    (async () => {
+      await authReady;
+
+      unsub = onAuthStateChanged(auth, (u) => {
+        if (!mounted) return;
+
+        // 1) user が取れたら即OK
+        if (u) {
+          if (timerRef.current) clearTimeout(timerRef.current);
+          setUser(u);
+          setChecking(false);
+          return;
+        }
+
+        // 2) null のときは「すぐログインへ飛ばさず」少し待つ
+        setChecking(true);
+        if (timerRef.current) clearTimeout(timerRef.current);
+
+        timerRef.current = setTimeout(() => {
+          if (!mounted) return;
+          setUser(null);
+          setChecking(false);
+        }, GRACE_MS);
+      });
+    })();
+
+    return () => {
+      mounted = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (unsub) unsub();
+    };
   }, []);
 
-  // 🔄 判定中（Auth復元待ち）
-  if (user === undefined) {
+  if (checking) {
     return (
-      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <p style={{ color: "#64748b" }}>確認中です…</p>
+      <div style={{ textAlign: "center", paddingTop: 120, fontSize: 16 }}>
+        🔄 読み込み中…
       </div>
     );
   }
 
-  // 🚫 未ログイン
   if (!user) {
-    const returnTo = location.pathname + location.search;
-    localStorage.setItem("mgpt_return_to", returnTo);
-
-    return <Navigate to={`/login?next=${encodeURIComponent(returnTo)}`} replace />;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // ✅ ログイン済み
   return children;
 }
