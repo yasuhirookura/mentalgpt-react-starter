@@ -3,7 +3,8 @@ import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
-import { auth, authReady } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase";
 
 const MAX = 400;
 const HINTS = [
@@ -31,35 +32,41 @@ const [userEmail, setUserEmail] = useState("");
 // ✅ 反映確認用タグ（表示されればデプロイはこのコード）
 const [buildTag] = useState(() => `dbg_${new Date().toISOString().slice(0, 19)}`);
 
+// 現在ユーザー（onAuthStateChangedで常時追跡）
+const [user, setUser] = useState(null);
+
 const endRef = useRef(null);
 
+// 下書き保存
 useEffect(() => {
 localStorage.setItem("draft", text);
 }, [text]);
 
-// 起動時：Auth確定 → uid/email表示 → /api/usage でサーバーの回数を取得
+// ✅ iOS Safari対策：authReadyではなく onAuthStateChanged を使う
 useEffect(() => {
-(async () => {
-try {
-await authReady;
-
-const u = auth.currentUser;
+const unsub = onAuthStateChanged(auth, async (u) => {
+setUser(u || null);
 setUserUid(u?.uid || "");
 setUserEmail(u?.email || "");
 
-if (!u) return;
-
-await refreshUsage();
-} catch (e) {
-console.error("[boot] error", e);
+// ログインしてないなら回数表示は初期値に戻すだけ
+if (!u) {
+setTodayCount(0);
+setPlanLimit(10);
+return;
 }
-})();
+
+// ログインしていたら usage を取得
+await refreshUsage(u);
+});
+
+return () => unsub();
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
-async function refreshUsage() {
+async function refreshUsage(uParam) {
 try {
-const u = auth.currentUser;
+const u = uParam || auth.currentUser;
 if (!u) return;
 
 const idToken = await u.getIdToken();
@@ -86,6 +93,13 @@ if (!body) return;
 if (body.length > MAX) return;
 if (isLoading) return;
 
+// 未ログインなら弾く（ここで安定させる）
+if (!user) {
+alert("ログインが必要です。");
+window.location.href = "/login";
+return;
+}
+
 // 画面の値で軽ガード（最終判定はサーバー）
 if (todayCount >= planLimit) {
 alert("本日の上限に達しました。明日またご利用ください。");
@@ -96,6 +110,7 @@ setIsLoading(true);
 setText("");
 localStorage.setItem("draft", "");
 
+// 先にユーザー発言は表示
 const userMsg = {
 id: `user_${Date.now()}`,
 role: "user",
@@ -106,15 +121,17 @@ setMessages((prev) => [...prev, userMsg]);
 setTimeout(() => scrollToBottom(false), 0);
 
 try {
-await authReady;
+// ここでも念のため currentUser を再取得（iOSでの揺らぎ対策）
 const u = auth.currentUser;
-const idToken = u ? await u.getIdToken() : null;
+if (!u) throw new Error("ログイン情報が見つかりません。もう一度ログインしてください。");
+
+const idToken = await u.getIdToken();
 
 const res = await fetch("/api/chat", {
 method: "POST",
 headers: {
 "Content-Type": "application/json",
-...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+Authorization: `Bearer ${idToken}`,
 },
 body: JSON.stringify({ message: body }),
 });
@@ -124,7 +141,9 @@ const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 const msg =
 data?.message ||
-(data?.error === "daily_limit" ? "本日の上限に達しました。" : `送信に失敗しました（${res.status}）`);
+(data?.error === "daily_limit"
+? "本日の上限に達しました。"
+: `送信に失敗しました（${res.status}）`);
 throw new Error(msg);
 }
 
@@ -133,7 +152,7 @@ if (data?.usage) {
 setTodayCount(Number(data.usage.usedToday ?? todayCount));
 setPlanLimit(Number(data.usage.dailyLimit ?? planLimit));
 } else {
-await refreshUsage();
+await refreshUsage(u);
 }
 
 const aiMsg = {
