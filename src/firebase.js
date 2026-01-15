@@ -1,13 +1,14 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 import {
   getAuth,
   setPersistence,
   indexedDBLocalPersistence,
   browserLocalPersistence,
+  browserSessionPersistence,
   onAuthStateChanged,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBG3jGtcLYsYt2X6Zem-W0-r5BdQR14XTI",
@@ -25,24 +26,47 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 /**
- * 🔐 Auth 永続化 & 初期化待ち
- * - iOS Safariでタブが落ちても復元されやすい
- * - 「一瞬ログアウト扱い」を防ぐ
+ * iOS Safari 対策：
+ * 1) IndexedDB を試す
+ * 2) ダメなら localStorage
+ * 3) それもダメなら session（最終フォールバック）
  */
-export const authReady = (async () => {
+async function initAuthPersistence() {
   try {
-    // ① 永続化を明示的に指定（重要）
     await setPersistence(auth, indexedDBLocalPersistence);
-  } catch (e) {
-    // IndexedDB がダメな場合の保険
-    console.warn("IndexedDB persistence failed, fallback to localStorage", e);
-    await setPersistence(auth, browserLocalPersistence);
+    console.log("[auth] persistence = indexedDBLocalPersistence");
+    return;
+  } catch (e1) {
+    console.warn("[auth] IndexedDB persistence failed", e1);
   }
 
-  // ② Firebase Auth の復元完了を待つ
-  await new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, () => {
-      unsubscribe();
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    console.log("[auth] persistence = browserLocalPersistence");
+    return;
+  } catch (e2) {
+    console.warn("[auth] local persistence failed", e2);
+  }
+
+  try {
+    await setPersistence(auth, browserSessionPersistence);
+    console.log("[auth] persistence = browserSessionPersistence");
+  } catch (e3) {
+    console.warn("[auth] session persistence failed", e3);
+  }
+}
+
+/**
+ * 起動直後に persistence を必ず確定させてから、
+ * Auth 状態が 1 回確定したタイミングで resolve する。
+ */
+export const authReady = (async () => {
+  await initAuthPersistence();
+
+  return await new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      console.log("[auth] onAuthStateChanged:", u ? u.uid : null);
+      unsub();
       resolve();
     });
   });
