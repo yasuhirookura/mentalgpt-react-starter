@@ -1,14 +1,12 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
 import {
-  getAuth,
-  setPersistence,
+  initializeAuth,
   indexedDBLocalPersistence,
   browserLocalPersistence,
-  browserSessionPersistence,
   onAuthStateChanged,
 } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBG3jGtcLYsYt2X6Zem-W0-r5BdQR14XTI",
@@ -22,52 +20,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// ✅ iOS Safari 対策：IndexedDB → localStorage の順に永続化を試す（同期初期化でレースを減らす）
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
+
 export const db = getFirestore(app);
 
-/**
- * iOS Safari 対策：
- * 1) IndexedDB を試す
- * 2) ダメなら localStorage
- * 3) それもダメなら session（最終フォールバック）
- */
-async function initAuthPersistence() {
-  try {
-    await setPersistence(auth, indexedDBLocalPersistence);
-    console.log("[auth] persistence = indexedDBLocalPersistence");
-    return;
-  } catch (e1) {
-    console.warn("[auth] IndexedDB persistence failed", e1);
-  }
-
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    console.log("[auth] persistence = browserLocalPersistence");
-    return;
-  } catch (e2) {
-    console.warn("[auth] local persistence failed", e2);
-  }
-
-  try {
-    await setPersistence(auth, browserSessionPersistence);
-    console.log("[auth] persistence = browserSessionPersistence");
-  } catch (e3) {
-    console.warn("[auth] session persistence failed", e3);
-  }
-}
-
-/**
- * 起動直後に persistence を必ず確定させてから、
- * Auth 状態が 1 回確定したタイミングで resolve する。
- */
-export const authReady = (async () => {
-  await initAuthPersistence();
-
-  return await new Promise((resolve) => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      console.log("[auth] onAuthStateChanged:", u ? u.uid : null);
-      unsub();
-      resolve();
-    });
+// ✅ 「Auth状態が確定した」ことを保証するゲート
+export const authReady = new Promise((resolve) => {
+  const unsub = onAuthStateChanged(auth, () => {
+    unsub();
+    resolve();
   });
-})();
+});
