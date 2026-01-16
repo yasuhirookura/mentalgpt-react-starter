@@ -1,14 +1,14 @@
 // src/App.js
 import "./App.css";
-import "./lib/windowApi"; // ← window.api をセット
+import "./lib/windowApi";
 
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// Firebase 初期化完了を待つ
+// Firebase
 import { authReady } from "./firebase";
 
-// --- ページ ---
+// ページ
 import LandingPage from "./pages/LandingPage";
 import Pricing from "./pages/Pricing";
 import Terms from "./pages/Terms";
@@ -20,16 +20,16 @@ import Dashboard from "./pages/Dashboard";
 import MyPage from "./pages/MyPage";
 import Archive from "./pages/Archive";
 import LoginForm from "./LoginForm";
-import SiteFooter from "./components/SiteFooter";
+import ResetPassword from "./pages/ResetPassword";
+import Welcome from "./pages/Welcome";
+import Account from "./pages/Account";
 
-// 課金フロー関連
-import Welcome from "./pages/Welcome";            // 決済後のパスワード設定案内
-import Account from "./pages/Account";            // マイアカウント（プラン/請求）
-import ProtectedRoute from "./components/ProtectedRoute.jsx"; // 認証ガード
-import ResetPassword from "./pages/ResetPassword";            // パスワード再発行
+// コンポーネント
+import SiteFooter from "./components/SiteFooter";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
-  // 🔒 Auth 初期化待ち（永続ログインの安定化）
+  // ✅ Auth 確定待ち（ログイン維持の要）
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,11 +37,12 @@ function App() {
     authReady.then(() => {
       if (mounted) setReady(true);
     });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!ready) {
-    // 初回ロード時のチラつき防止用の簡易ローディング
     return (
       <div style={{ textAlign: "center", paddingTop: 120, fontSize: 16 }}>
         🔄 読み込み中…
@@ -61,17 +62,36 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/faq" element={<Faq />} />
 
-        {/* 🔐 認証系 */}
+        {/* 🔐 認証 */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/welcome" element={<Welcome />} /> {/* 決済→遷移 */}
+        <Route path="/welcome" element={<Welcome />} />
 
-        {/* アプリ内ページ */}
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/mypage" element={<MyPage />} />
-        <Route path="/archive" element={<Archive />} />
-
-        {/* 課金アカウント（要ログイン） */}
+        {/* 🔒 要ログインページ */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mypage"
+          element={
+            <ProtectedRoute>
+              <MyPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/archive"
+          element={
+            <ProtectedRoute>
+              <Archive />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/account"
           element={
@@ -81,7 +101,7 @@ function App() {
           }
         />
 
-        {/* 🚫 404 → LP */}
+        {/* 🚫 404 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
