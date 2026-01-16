@@ -5,39 +5,40 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, authReady } from "../firebase";
 
 export default function ProtectedRoute({ children }) {
-  const [checked, setChecked] = useState(false);
-  const [user, setUser] = useState(null);
   const location = useLocation();
+  const [status, setStatus] = useState("checking"); // checking | authed | guest
 
   useEffect(() => {
-    let unsub = null;
+    let alive = true;
 
     (async () => {
-      // ✅ ここが超重要：Authが確定するまで “判定しない”
+      // ✅ まず persistence 設定＆初回復元を待つ
       await authReady;
 
-      unsub = onAuthStateChanged(auth, (u) => {
-        setUser(u || null);
-        setChecked(true);
+      // ✅ その後も iOS の「一瞬null」揺れに耐えるため、購読を維持
+      const unsub = onAuthStateChanged(auth, (u) => {
+        if (!alive) return;
+        setStatus(u ? "authed" : "guest");
       });
+
+      return () => unsub();
     })();
 
     return () => {
-      if (typeof unsub === "function") unsub();
+      alive = false;
     };
   }, []);
 
-  // ✅ 判定前はリダイレクトしない（ここで飛ばすと「すぐログイン画面へ」になる）
-  if (!checked) {
+  if (status === "checking") {
     return (
       <div style={{ textAlign: "center", paddingTop: 120, fontSize: 16 }}>
-        🔄 読み込み中…
+        🔄 認証を確認中…
       </div>
     );
   }
 
-  // ✅ Auth確定後にユーザーがいなければログインへ
-  if (!user) {
+  if (status === "guest") {
+    // 次に戻れるように next を付ける
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?next=${next}`} replace />;
   }

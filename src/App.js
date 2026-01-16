@@ -67,31 +67,31 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/welcome" element={<Welcome />} />
 
-        {/* 🔒 要ログインページ */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mypage"
-          element={
-            <ProtectedRoute>
-              <MyPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/archive"
-          element={
-            <ProtectedRoute>
-              <Archive />
-            </ProtectedRoute>
-          }
-        />
+        {/* アプリ内ページ（要ログイン） */}
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mypage"
+  element={
+    <ProtectedRoute>
+      <MyPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/archive"
+  element={
+    <ProtectedRoute>
+      <Archive />
+    </ProtectedRoute>
+  }
+/>
         <Route
           path="/account"
           element={
