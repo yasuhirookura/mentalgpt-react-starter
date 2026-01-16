@@ -2,8 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import {
-  getAuth,
-  setPersistence,
+  initializeAuth,
   indexedDBLocalPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -20,47 +19,44 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-
-export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 /**
- * iOS Safari / PWA / アプリ切替対策
- * 成功した persistence を1つでも使う
+ * ✅ ここが重要：
+ * initializeAuth に「優先順で persistence を配列指定」するのが安定。
+ * - まず IndexedDB
+ * - ダメなら localStorage
+ * - 最後の逃げとして session（※これに落ちると“落ちやすい”のでログで分かるようにする）
  */
-async function setupPersistence() {
+function initAuth() {
   try {
-    await setPersistence(auth, indexedDBLocalPersistence);
-    console.log("[auth] persistence = indexedDB");
-    return;
-  } catch (e) {
-    console.warn("[auth] indexedDB failed");
-  }
+    const a = initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+    });
+    console.log("[auth] persistence candidates = indexedDB -> localStorage");
+    return a;
+  } catch (e1) {
+    console.warn("[auth] initializeAuth(indexedDB/local) failed:", e1);
 
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    console.log("[auth] persistence = localStorage");
-    return;
-  } catch (e) {
-    console.warn("[auth] localStorage failed");
+    // フォールバック（session）
+    const a = initializeAuth(app, {
+      persistence: [browserLocalPersistence, browserSessionPersistence],
+    });
+    console.log("[auth] persistence candidates = localStorage -> session");
+    return a;
   }
-
-  await setPersistence(auth, browserSessionPersistence);
-  console.warn("[auth] persistence = session (fallback)");
 }
 
-/**
- * 🔑 ここが超重要
- * persistence 設定後に auth 状態が復元された「1回目」を待つ
- */
-export const authReady = (async () => {
-  await setupPersistence();
+export const auth = initAuth();
 
-  return new Promise((resolve) => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      console.log("[authReady]", user ? user.uid : "no user");
-      unsub();
-      resolve(user);
-    });
+/**
+ * ✅ authReady:
+ * 「復元が一度確定する」まで待つ
+ */
+export const authReady = new Promise((resolve) => {
+  const unsub = onAuthStateChanged(auth, (u) => {
+    console.log("[authReady] user =", u ? ${u.uid} / ${u.email || ""} : "null");
+    unsub();
+    resolve(u);
   });
-})();
+});
