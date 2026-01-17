@@ -6,73 +6,54 @@ collection,
 query,
 where,
 orderBy,
-getDocs,
 limit,
+getDocs,
 } from "firebase/firestore";
-import { auth, authReady, db } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db, authReady } from "../firebase";
 
-function toDateKey(ts) {
-// ts: Firestore Timestamp or Date or string
-try {
-const d =
-ts?.toDate?.() ? ts.toDate() :
-ts instanceof Date ? ts :
-typeof ts === "string" ? new Date(ts) :
-null;
-if (!d || isNaN(d.getTime())) return "unknown";
-// 例: 2026-01-18
-const y = d.getFullYear();
-const m = String(d.getMonth() + 1).padStart(2, "0");
-const day = String(d.getDate()).padStart(2, "0");
-return `${y}-${m}-${day}`;
-} catch {
-return "unknown";
-}
-}
-
-function fmt(ts) {
-try {
-const d = ts?.toDate?.() ? ts.toDate() : new Date(ts);
-return d.toLocaleString("ja-JP");
-} catch {
-return "";
-}
-}
+const PAGE_SIZE = 300;
 
 export default function Archive() {
+const [user, setUser] = useState(null);
+const [items, setItems] = useState([]); // 1件 = 1メッセージ
 const [loading, setLoading] = useState(true);
 const [err, setErr] = useState("");
-const [items, setItems] = useState([]); // {id, createdAt, userMessage, gptResponse}
-const [activeDay, setActiveDay] = useState("");
+
+const [openDay, setOpenDay] = useState(null);
 
 useEffect(() => {
+let unsub = () => {};
+(async () => {
+await authReady;
+unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
+})();
+return () => unsub();
+}, []);
+
+useEffect(() => {
+if (!user) {
+setLoading(false);
+return;
+}
 (async () => {
 setLoading(true);
 setErr("");
 try {
-const u = await authReady;
-if (!u) {
-setItems([]);
-setActiveDay("");
-return;
-}
-
-// ※ where(uid==) + orderBy(createdAt desc) は
-// インデックスが要求されることがあります（エラーにリンクが出ます）
 const q = query(
 collection(db, "conversations"),
-where("uid", "==", u.uid),
+where("uid", "==", user.uid),
+orderBy("dayKey", "desc"),
 orderBy("createdAt", "desc"),
-limit(500)
+limit(PAGE_SIZE)
 );
-
 const snap = await getDocs(q);
-const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-setItems(list);
+const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+setItems(rows);
 
-// 最初は最新日のタブを開く
-const firstKey = list.length ? toDateKey(list[0].createdAt) : "";
-setActiveDay(firstKey);
+if (rows.length > 0) {
+setOpenDay(rows[0].dayKey || null);
+}
 } catch (e) {
 console.error("[Archive] load error", e);
 setErr(e?.message || String(e));
@@ -80,24 +61,40 @@ setErr(e?.message || String(e));
 setLoading(false);
 }
 })();
-}, []);
+}, [user?.uid]);
 
 const grouped = useMemo(() => {
 const map = new Map();
 for (const it of items) {
-const key = toDateKey(it.createdAt);
-if (!map.has(key)) map.set(key, []);
-map.get(key).push(it);
+const day = it.dayKey || "unknown";
+if (!map.has(day)) map.set(day, []);
+map.get(day).push(it);
 }
-// Mapを配列に（キー降順）
-const keys = Array.from(map.keys()).sort((a, b) => (a < b ? 1 : -1));
-return { map, keys };
+const out = Array.from(map.entries()).map(([dayKey, list]) => ({
+dayKey,
+list: list
+.slice()
+.sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt)), // 古→新
+}));
+out.sort((a, b) => (a.dayKey < b.dayKey ? 1 : -1)); // 新しい日→古い日
+return out;
 }, [items]);
 
-const activeList = grouped.map.get(activeDay) || [];
+const days = grouped.map((g) => g.dayKey);
+
+if (!user) {
+return (
+<main className="container" style={{ maxWidth: 820 }}>
+<h1>アーカイブ</h1>
+<p>
+<Link to="/login">ログイン</Link>してください。
+</p>
+</main>
+);
+}
 
 return (
-<main className="container" style={{ maxWidth: 900 }}>
+<main className="container" style={{ maxWidth: 980 }}>
 <header style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "10px 0" }}>
 <h1 style={{ margin: 0 }}>アーカイブ</h1>
 <span style={{ marginLeft: "auto" }}>
@@ -105,71 +102,111 @@ return (
 </span>
 </header>
 
-{loading && <p>読み込み中…</p>}
 {err && (
-<div style={{ background: "#fff6e6", border: "1px solid #f3e2b8", padding: 12, borderRadius: 8 }}>
-<div style={{ fontWeight: 700, marginBottom: 6 }}>読み込みエラー</div>
-<div style={{ whiteSpace: "pre-wrap" }}>{err}</div>
-<div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
-※ `where(uid==)` + `orderBy(createdAt)` は Firestore のインデックス作成が必要な場合があります。
-エラー文に出るリンクから作成してください。
-</div>
+<div style={{ background: "#fff3f3", border: "1px solid #ffd0d0", padding: 10, borderRadius: 10 }}>
+<b>読み込みエラー</b>
+<div style={{ whiteSpace: "pre-wrap", fontSize: 13, marginTop: 6 }}>{err}</div>
 </div>
 )}
 
-{!loading && !err && items.length === 0 && (
-<p style={{ color: "#666" }}>
-まだ履歴がありません。<Link to="/dashboard">投稿</Link>してみてください。
-</p>
-)}
+<div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 14 }}>
+{/* 左：日付 */}
+<aside style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#fff" }}>
+<div style={{ fontWeight: 700, marginBottom: 8 }}>日付</div>
 
-{!loading && !err && items.length > 0 && (
-<div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 12 }}>
-{/* 日付一覧 */}
-<aside style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>
-<div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>日付</div>
-{grouped.keys.map((k) => (
+{loading && <div style={{ color: "#666" }}>読み込み中…</div>}
+{!loading && days.length === 0 && <div style={{ color: "#888" }}>まだ履歴がありません</div>}
+
+<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+{grouped.map((g) => (
 <button
-key={k}
-onClick={() => setActiveDay(k)}
+key={g.dayKey}
+type="button"
+onClick={() => setOpenDay(g.dayKey)}
 style={{
-width: "100%",
 textAlign: "left",
-padding: "8px 10px",
-marginBottom: 6,
-borderRadius: 8,
 border: "1px solid #e5e7eb",
-background: k === activeDay ? "#e7f1ff" : "#fff",
+background: openDay === g.dayKey ? "#e7f1ff" : "#fff",
+borderRadius: 10,
+padding: "8px 10px",
 cursor: "pointer",
 }}
 >
-{k} <span style={{ color: "#666", fontSize: 12 }}>({grouped.map.get(k)?.length || 0})</span>
+{g.dayKey}（{g.list.length}）
 </button>
 ))}
+</div>
 </aside>
 
-{/* 会話一覧 */}
-<section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, background: "#fff" }}>
-<h2 style={{ marginTop: 0, fontSize: 16 }}>{activeDay || "（日付未選択）"}</h2>
+{/* 右：本文 */}
+<section style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff", minHeight: "60vh" }}>
+{!openDay && <div style={{ color: "#888" }}>左の日付を選ぶと表示されます</div>}
 
-{activeList.map((it) => (
-<div key={it.id} style={{ padding: "10px 0", borderTop: "1px solid #f0f0f0" }}>
-<div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>{fmt(it.createdAt)}</div>
+{openDay && (
+<>
+<div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>{openDay}</div>
 
-<div style={{ background: "#e7f1ff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, marginBottom: 8 }}>
-<div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>あなた</div>
-<div style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>{it.userMessage || ""}</div>
-</div>
-
-<div style={{ background: "#f6f6f6", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10 }}>
-<div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>MentalGPT</div>
-<div style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>{it.gptResponse || ""}</div>
-</div>
-</div>
+<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+{(grouped.find((g) => g.dayKey === openDay)?.list || []).map((m) => (
+<Bubble key={m.id} role={m.role} content={pickContent(m)} createdAt={m.createdAt} />
 ))}
+</div>
+</>
+)}
 </section>
 </div>
-)}
 </main>
 );
+}
+
+function Bubble({ role, content, createdAt }) {
+const isUser = role === "user";
+return (
+<div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
+<div
+style={{
+background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
+border: "1px solid #e5e7eb",
+padding: "10px 12px",
+borderRadius: 12,
+maxWidth: "86%",
+lineHeight: 1.8,
+whiteSpace: "pre-wrap",
+wordBreak: "break-word",
+}}
+>
+<div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+{isUser ? "あなた" : role === "ai" ? "MentalGPT" : "システム"} ・ {formatTs(createdAt)}
+</div>
+<div>{content || "(本文なし)"}</div>
+</div>
+</div>
+);
+}
+
+function pickContent(m) {
+// ✅ Firestore実データの content を最優先
+if (typeof m?.content === "string" && m.content.trim()) return m.content;
+
+// 互換：昔の形が混ざってても拾う
+if (m?.role === "user" && typeof m?.userMessage === "string") return m.userMessage;
+if (m?.role === "ai" && typeof m?.gptResponse === "string") return m.gptResponse;
+
+if (typeof m?.text === "string") return m.text;
+if (typeof m?.message === "string") return m.message;
+
+return "";
+}
+
+function toMillis(ts) {
+if (!ts) return 0;
+if (typeof ts.toMillis === "function") return ts.toMillis(); // Firestore Timestamp
+const d = new Date(ts);
+return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function formatTs(ts) {
+const ms = toMillis(ts);
+if (!ms) return "";
+return new Date(ms).toLocaleString("ja-JP");
 }
