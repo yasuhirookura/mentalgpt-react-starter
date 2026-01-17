@@ -2,61 +2,64 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import {
-  initializeAuth,
-  indexedDBLocalPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  onAuthStateChanged,
+getAuth,
+setPersistence,
+indexedDBLocalPersistence,
+browserLocalPersistence,
+browserSessionPersistence,
+onAuthStateChanged,
 } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBG3jGtcLYsYt2X6Zem-W0-r5BdQR14XTI",
-  authDomain: "mentalgpt-19189.firebaseapp.com",
-  projectId: "mentalgpt-19189",
-  storageBucket: "mentalgpt-19189.firebasestorage.app",
-  messagingSenderId: "159888180556",
-  appId: "1:159888180556:web:6bbc310de7dcb716847be9",
+apiKey: "AIzaSyBG3jGtcLYsYt2X6Zem-W0-r5BdQR14XTI",
+authDomain: "mentalgpt-19189.firebaseapp.com",
+projectId: "mentalgpt-19189",
+storageBucket: "mentalgpt-19189.firebasestorage.app",
+messagingSenderId: "159888180556",
+appId: "1:159888180556:web:6bbc310de7dcb716847be9",
 };
 
 const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-/**
- * ✅ ここが重要：
- * initializeAuth に「優先順で persistence を配列指定」するのが安定。
- * - まず IndexedDB
- * - ダメなら localStorage
- * - 最後の逃げとして session（※これに落ちると“落ちやすい”のでログで分かるようにする）
- */
-function initAuth() {
-  try {
-    const a = initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-    });
-    console.log("[auth] persistence candidates = indexedDB -> localStorage");
-    return a;
-  } catch (e1) {
-    console.warn("[auth] initializeAuth(indexedDB/local) failed:", e1);
-
-    // フォールバック（session）
-    const a = initializeAuth(app, {
-      persistence: [browserLocalPersistence, browserSessionPersistence],
-    });
-    console.log("[auth] persistence candidates = localStorage -> session");
-    return a;
-  }
+// iOS Safari / PWA 対策：使える persistence を順に試す
+async function setupPersistence() {
+try {
+await setPersistence(auth, indexedDBLocalPersistence);
+console.log("[auth] persistence = indexedDB");
+return "indexedDB";
+} catch (e) {
+console.warn("[auth] indexedDB failed", e);
 }
 
-export const auth = initAuth();
+try {
+await setPersistence(auth, browserLocalPersistence);
+console.log("[auth] persistence = localStorage");
+return "localStorage";
+} catch (e) {
+console.warn("[auth] localStorage failed", e);
+}
 
-/**
- * ✅ authReady:
- * 「復元が一度確定する」まで待つ
- */
-export const authReady = new Promise((resolve) => {
-  const unsub = onAuthStateChanged(auth, (u) => {
-    console.log("[authReady] user =", u ? ${u.uid} / ${u.email || ""} : "null");
-    unsub();
-    resolve(u);
-  });
+try {
+await setPersistence(auth, browserSessionPersistence);
+console.log("[auth] persistence = session");
+return "session";
+} catch (e) {
+console.warn("[auth] session failed", e);
+return "none";
+}
+}
+
+// persistence 設定後、Auth状態が1回確定するのを待つ
+export const authReady = (async () => {
+await setupPersistence();
+return await new Promise((resolve) => {
+const unsub = onAuthStateChanged(auth, (user) => {
+console.log("[authReady]", user ? user.uid : "no user");
+unsub();
+resolve(user || null);
 });
+});
+})();
