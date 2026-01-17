@@ -24,42 +24,43 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// iOS Safari / PWA 対策：使える persistence を順に試す
 async function setupPersistence() {
+// iOS Safari対策：IndexedDB → localStorage → session の順で確定
 try {
 await setPersistence(auth, indexedDBLocalPersistence);
 console.log("[auth] persistence = indexedDB");
-return "indexedDB";
+return;
 } catch (e) {
-console.warn("[auth] indexedDB failed", e);
+console.warn("[auth] indexedDB persistence failed", e);
 }
 
 try {
 await setPersistence(auth, browserLocalPersistence);
 console.log("[auth] persistence = localStorage");
-return "localStorage";
+return;
 } catch (e) {
-console.warn("[auth] localStorage failed", e);
+console.warn("[auth] localStorage persistence failed", e);
 }
 
 try {
 await setPersistence(auth, browserSessionPersistence);
-console.log("[auth] persistence = session");
-return "session";
+console.warn("[auth] persistence = session (fallback)");
 } catch (e) {
-console.warn("[auth] session failed", e);
-return "none";
+console.warn("[auth] session persistence failed", e);
 }
 }
 
-// persistence 設定後、Auth状態が1回確定するのを待つ
+/**
+* persistence を確定させてから、Auth復元が「1回確定」するまで待つ
+*/
 export const authReady = (async () => {
 await setupPersistence();
-return await new Promise((resolve) => {
-const unsub = onAuthStateChanged(auth, (user) => {
-console.log("[authReady]", user ? user.uid : "no user");
+
+return new Promise((resolve) => {
+const unsub = onAuthStateChanged(auth, (u) => {
+console.log("[authReady]", u ? u.uid : "no user");
 unsub();
-resolve(user || null);
+resolve(u);
 });
 });
 })();
