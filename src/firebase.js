@@ -1,17 +1,16 @@
-// src/firebase.js (CRA + Firebase v9 modular, iOS-friendly persistence)
-
-import { initializeApp, getApps } from "firebase/app";
+// src/firebase.js (CRA)
+import { initializeApp } from "firebase/app";
 import {
 getAuth,
-onAuthStateChanged,
 setPersistence,
-indexedDBLocalPersistence,
 browserLocalPersistence,
 browserSessionPersistence,
+inMemoryPersistence,
+onAuthStateChanged,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// --- env (CRA) ---
+// env（CRA は REACT_APP_ だけが注入されます）
 const firebaseConfig = {
 apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
 authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -21,66 +20,80 @@ messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
 appId: process.env.REACT_APP_FIREBASE_APP_ID,
 };
 
-// --- basic validation ---
-const missing = Object.entries(firebaseConfig)
-.filter(([, v]) => !v)
-.map(([k]) => k);
+// 必須envチェック（欠けてたらコンソールで即分かる）
+const requiredKeys = [
+"REACT_APP_FIREBASE_API_KEY",
+"REACT_APP_FIREBASE_AUTH_DOMAIN",
+"REACT_APP_FIREBASE_PROJECT_ID",
+"REACT_APP_FIREBASE_STORAGE_BUCKET",
+"REACT_APP_FIREBASE_MESSAGING_SENDER_ID",
+"REACT_APP_FIREBASE_APP_ID",
+];
 
+const missing = requiredKeys.filter((k) => !process.env[k]);
 if (missing.length) {
 console.error("[firebase] Missing env vars:", missing);
 }
 
-// --- init app (avoid double init in dev/HMR) ---
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 
-// --- exports ---
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-/**
-* iOS Safari は状況次第で IndexedDB が不安定なことがあるので、
-* 1) indexedDB → 2) localStorage → 3) session の順でフォールバック
-*
-* 重要：ログイン前にこれが完了している必要がある
-*/
-async function ensurePersistence() {
-// すでにセット済みでも害はないが、失敗時のfallbackのため毎回tryする
-const candidates = [
-{ name: "indexedDBLocalPersistence", value: indexedDBLocalPersistence },
-{ name: "browserLocalPersistence", value: browserLocalPersistence },
-{ name: "browserSessionPersistence", value: browserSessionPersistence },
-];
-
-for (const p of candidates) {
+// iOS Safari対策：
+// 1) localPersistence がダメなら session → memory にフォールバック
+// 2) onAuthStateChanged を待つが、必ずタイムアウトで抜ける（無限ローディング防止）
+export const authReady = (async () => {
+// setPersistence が iOS/設定/ストレージ状態によって失敗することがある
 try {
-await setPersistence(auth, p.value);
-console.log(`[firebase] persistence set: ${p.name}`);
-return p.name;
-} catch (e) {
-console.warn(`[firebase] persistence failed: ${p.name}`, e);
+await setPersistence(auth, browserLocalPersistence);
+// console.log("[firebase] persistence: local");
+} catch (e1) {
+console.warn("[firebase] local persistence failed:", e1);
+try {
+await setPersistence(auth, browserSessionPersistence);
+// console.log("[firebase] persistence: session");
+} catch (e2) {
+console.warn("[firebase] session persistence failed:", e2);
+await setPersistence(auth, inMemoryPersistence);
+// console.log("[firebase] persistence: memory");
 }
 }
 
-// ここまで来たらかなり異常（Cookieブロック/プライベートなど）
-console.error("[firebase] Could not set any persistence.");
-return null;
+await new Promise((resolve) => {
+let done = false;
+
+const timer = setTimeout(() => {
+if (done) return;
+done = true;
+try {
+unsub && unsub();
+} catch {}
+console.warn("[firebase] authReady timeout -> continue");
+resolve();
+}, 4000); // 4秒で強制的に先へ（無限ローディング回避）
+
+const unsub = onAuthStateChanged(
+auth,
+() => {
+if (done) return;
+done = true;
+clearTimeout(timer);
+try {
+unsub();
+} catch {}
+resolve();
+},
+(err) => {
+if (done) return;
+done = true;
+clearTimeout(timer);
+try {
+unsub();
+} catch {}
+console.warn("[firebase] onAuthStateChanged error:", err);
+resolve();
 }
-
-/**
-* auth復元が終わったかどうかを外部から待てるようにする
-*/
-let _authReadyResolve;
-export const authReady = new Promise((resolve) => {
-_authReadyResolve = resolve;
-});
-
-// ここが超重要：起動時に必ず persistence → onAuthStateChanged の順にする
-(async () => {
-await ensurePersistence();
-
-onAuthStateChanged(auth, (user) => {
-// user が null でも「復元処理が終わった」ことが重要
-window.__MENTALGPT_USER__ = user ? { uid: user.uid, email: user.email } : null;
-_authReadyResolve(user);
+);
 });
 })();
