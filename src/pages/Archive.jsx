@@ -2,14 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-collection,
-getDocs,
-limit,
-orderBy,
-query,
-where,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { auth, authReady, db } from "../firebase";
 
 function dayKeyJST(d = new Date()) {
@@ -33,6 +26,34 @@ return "";
 }
 }
 
+/** Archive.jsx だけで “スマホ判定” できるようにする */
+function useMediaQuery(queryStr) {
+const [matches, setMatches] = useState(() => {
+if (typeof window === "undefined") return false;
+return window.matchMedia(queryStr).matches;
+});
+
+useEffect(() => {
+if (typeof window === "undefined") return;
+const mq = window.matchMedia(queryStr);
+const handler = () => setMatches(mq.matches);
+
+// 初期反映
+handler();
+
+// Safari対策：addEventListener が無い場合がある
+if (mq.addEventListener) mq.addEventListener("change", handler);
+else mq.addListener(handler);
+
+return () => {
+if (mq.removeEventListener) mq.removeEventListener("change", handler);
+else mq.removeListener(handler);
+};
+}, [queryStr]);
+
+return matches;
+}
+
 export default function Archive() {
 const [uid, setUid] = useState("");
 const [ready, setReady] = useState(false);
@@ -46,6 +67,9 @@ const [items, setItems] = useState([]); // [{id, role, content, createdAt}]
 const [loadingDays, setLoadingDays] = useState(false);
 const [loadingItems, setLoadingItems] = useState(false);
 const [err, setErr] = useState("");
+
+// ★ ここでスマホ/タブレット判定（iPhone含む）
+const isNarrow = useMediaQuery("(max-width: 820px)");
 
 // 起動：auth確定→uid確定
 useEffect(() => {
@@ -171,12 +195,22 @@ return (
 }, []);
 
 if (!ready) {
-return (
-<div style={{ textAlign: "center", paddingTop: 120 }}>
-🔄 読み込み中…
-</div>
-);
+return <div style={{ textAlign: "center", paddingTop: 120 }}>🔄 読み込み中…</div>;
 }
+
+// --- ★ レイアウトをスマホで切り替える（ここが核心） ---
+const gridStyle = isNarrow
+? { display: "grid", gridTemplateColumns: "1fr", gap: 12, alignItems: "start" }
+: { display: "grid", gridTemplateColumns: "280px 1fr", gap: 12, alignItems: "start" };
+
+// 日付リスト：スマホは横スクロール “チップ” 方式に
+const dayListWrapStyle = isNarrow
+? { display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 6 }
+: { display: "flex", flexDirection: "column", gap: 8 };
+
+const dayButtonStyleBase = isNarrow
+? { whiteSpace: "nowrap", flex: "0 0 auto" }
+: {};
 
 return (
 <main className="container" style={{ maxWidth: 980, marginTop: 0, paddingTop: 0 }}>
@@ -207,14 +241,7 @@ color: "#7a4b00",
 </div>
 )}
 
-<div
-style={{
-display: "grid",
-gridTemplateColumns: "280px 1fr",
-gap: 12,
-alignItems: "start",
-}}
->
+<div style={gridStyle}>
 {/* 左：日付一覧 */}
 <section
 style={{
@@ -231,7 +258,7 @@ background: "#fff",
 ) : days.length === 0 ? (
 <div style={{ color: "#888" }}>まだ履歴がありません。</div>
 ) : (
-<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+<div style={dayListWrapStyle}>
 {days.map((d) => {
 const active = d.dayKey === selectedDay;
 return (
@@ -247,6 +274,7 @@ border: "1px solid #e5e7eb",
 background: active ? "#e7f1ff" : "#fff",
 cursor: "pointer",
 fontSize: 14,
+...dayButtonStyleBase,
 }}
 >
 {d.dayKey} <span style={{ color: "#666" }}>({d.count})</span>
@@ -265,13 +293,12 @@ borderRadius: 12,
 padding: 12,
 background: "#fff",
 minHeight: "55vh",
+minWidth: 0, // ★ grid/flex で “本文が潰れる” のを防ぐ超重要項目
 }}
 >
 <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
 <h2 style={{ margin: 0, fontSize: 22 }}>{selectedDay || "—"}</h2>
-<span style={{ fontSize: 12, color: "#666" }}>
-{uid ? `uid: ${uid.slice(0, 8)}…` : ""}
-</span>
+<span style={{ fontSize: 12, color: "#666" }}>{uid ? `uid: ${uid.slice(0, 8)}…` : ""}</span>
 </div>
 
 <div style={{ marginTop: 10 }}>
@@ -280,7 +307,16 @@ minHeight: "55vh",
 ) : items.length === 0 ? (
 <div style={{ color: "#888" }}>この日の履歴はまだありません。</div>
 ) : (
-<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+<div
+style={{
+display: "flex",
+flexDirection: "column",
+gap: 10,
+// PCでの読みやすさも上げる（スマホは全幅）
+maxWidth: isNarrow ? "100%" : 740,
+margin: isNarrow ? "0" : "0 auto",
+}}
+>
 {items.map((m) => (
 <Bubble key={m.id} role={m.role} content={m.content} createdAt={m.createdAt} />
 ))}
