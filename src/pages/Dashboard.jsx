@@ -4,14 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TextareaAutosize from "react-textarea-autosize";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-collection,
-getDocs,
-limit,
-orderBy,
-query,
-where,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { auth, authReady, db } from "../firebase";
 
 const MAX = 400;
@@ -21,6 +14,9 @@ const HINTS = [
 "あなたの気持ちに寄り添っています…",
 "少しだけお待ちください…",
 ];
+
+// ✅ デバッグ表示のON/OFF（通常運用は false 推奨）
+const SHOW_DEBUG = false;
 
 function dayKeyJST(d = new Date()) {
 return new Intl.DateTimeFormat("en-CA", {
@@ -266,9 +262,12 @@ margin: "8px 0 4px",
 今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
 </span>
 
+{/* ✅ デバッグ表示（通常は非表示） */}
+{SHOW_DEBUG && (
 <span style={{ fontSize: 11, color: "#999" }}>
 uid: {userUid || "(未取得)"} {userEmail ? ` / ${userEmail}` : ""} / dayKey: {dayKeyJST()}
 </span>
+)}
 
 <span style={{ marginLeft: "auto", fontSize: 13 }}>
 <Link to="/archive">アーカイブ</Link> / <Link to="/mypage">マイページ</Link>
