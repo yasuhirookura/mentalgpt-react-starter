@@ -1,77 +1,85 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
 import {
-getAuth,
-onAuthStateChanged,
-setPersistence,
-indexedDBLocalPersistence,
-browserLocalPersistence,
-browserSessionPersistence,
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// ▼ ここはあなたの既存の設定をそのまま使ってください（値は変更しない）
-const firebaseConfig = {
-apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-appId: import.meta.env.VITE_FIREBASE_APP_ID,
+// CRA / Vite 両対応で env を読む（import時に落ちないように安全に）
+const viteEnv =
+  (typeof import.meta !== "undefined" && import.meta && import.meta.env)
+    ? import.meta.env
+    : {};
+
+const readEnv = (key) => {
+  // Vite: import.meta.env / CRA: process.env
+  return (
+    (viteEnv && viteEnv[key]) ||
+    (typeof process !== "undefined" && process.env && process.env[key]) ||
+    ""
+  );
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+// Vite名 / CRA名 どっちでも拾う
+const firebaseConfig = {
+  apiKey:
+    readEnv("VITE_FIREBASE_API_KEY") ||
+    readEnv("REACT_APP_FIREBASE_API_KEY"),
+  authDomain:
+    readEnv("VITE_FIREBASE_AUTH_DOMAIN") ||
+    readEnv("REACT_APP_FIREBASE_AUTH_DOMAIN"),
+  projectId:
+    readEnv("VITE_FIREBASE_PROJECT_ID") ||
+    readEnv("REACT_APP_FIREBASE_PROJECT_ID"),
+  storageBucket:
+    readEnv("VITE_FIREBASE_STORAGE_BUCKET") ||
+    readEnv("REACT_APP_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId:
+    readEnv("VITE_FIREBASE_MESSAGING_SENDER_ID") ||
+    readEnv("REACT_APP_FIREBASE_MESSAGING_SENDER_ID"),
+  appId:
+    readEnv("VITE_FIREBASE_APP_ID") ||
+    readEnv("REACT_APP_FIREBASE_APP_ID"),
+};
 
-/**
-* iOS Safari / プライベートブラウズ等では IndexedDB が使えない場合があるため、
-* 永続化(persistence)を「IndexedDB → LocalStorage → Session」の順でフォールバックします。
-*/
-async function ensurePersistence() {
-// 1) IndexedDB（最強）
-try {
-await setPersistence(auth, indexedDBLocalPersistence);
-console.log("[auth] persistence = indexedDBLocalPersistence");
-return;
-} catch (e) {
-console.warn("[auth] indexedDBLocalPersistence failed -> fallback", e);
-}
+export const firebaseConfigOk =
+  !!firebaseConfig.apiKey && !!firebaseConfig.authDomain && !!firebaseConfig.projectId;
 
-// 2) LocalStorage（次点）
-try {
-await setPersistence(auth, browserLocalPersistence);
-console.log("[auth] persistence = browserLocalPersistence");
-return;
-} catch (e) {
-console.warn("[auth] browserLocalPersistence failed -> fallback", e);
-}
-
-// 3) Session（最後の砦：タブを閉じると消える）
-try {
-await setPersistence(auth, browserSessionPersistence);
-console.log("[auth] persistence = browserSessionPersistence");
-return;
-} catch (e) {
-console.error("[auth] browserSessionPersistence failed", e);
-}
-}
-
-/**
-* authReady:
-* - persistence を先に確定させる
-* - その後、Auth の初回状態（ログイン済み/未ログイン）を 1回だけ確定させる
-*
-* Archive.jsx / Dashboard.jsx などで `await authReady;` してから処理すると安定します。
-*/
-export const authReady = (async () => {
-await ensurePersistence();
-
-// 初回の auth state を 1回確定させたら resolve
-await new Promise((resolve) => {
-const unsub = onAuthStateChanged(auth, () => {
-unsub();
-resolve();
-});
-});
+export const firebaseInitError = (() => {
+  if (firebaseConfigOk) return "";
+  return (
+    "Firebase設定（環境変数）が不足しています。VercelのEnvironment Variablesを確認してください。\n" +
+    "必要: API_KEY / AUTH_DOMAIN / PROJECT_ID など"
+  );
 })();
+
+let app = null;
+let auth = null;
+let db = null;
+
+// 初期化はtry/catch（ここで落ちて白画面にならないように）
+try {
+  if (!firebaseConfigOk) {
+    console.error("[firebase] Missing env vars:", firebaseConfig);
+  } else {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  }
+} catch (e) {
+  console.error("[firebase] init failed:", e);
+}
+
+// authReady: 起動直後のnull対策 + persistence(local) を確定
+export const authReady = (async () => {
+  if (!auth) return;
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (e) {
+    console.warn("[firebase] setPersistence failed:", e);
+  }
+})();
+
+export { app, auth, db };
