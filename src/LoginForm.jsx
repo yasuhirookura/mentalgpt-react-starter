@@ -1,7 +1,7 @@
 // src/LoginForm.jsx
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
-import { auth, authReady } from "./firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase";
 import "./LoginForm.css";
 
 export default function LoginForm() {
@@ -21,36 +21,8 @@ return;
 
 try {
 setLoading(true);
-
-// ✅ persistence 設定＆初回復元を確定（firebase.js側を待つ）
-await authReady;
-
-// ✅ ログイン
-const cred = await signInWithEmailAndPassword(auth, email, pw);
-console.log("[Login] success uid=", cred?.user?.uid);
-
-// ✅ iOS Safari 対策：トークン確定を待つ
-try {
-await cred.user.getIdToken(true);
-} catch {}
-
-// ✅ 「Authが確実に user になった」ことを1回確認してから遷移
-await waitForUserSettled(2000);
-
-// 行き先を決める（URL ?next=、localStorage、なければ /dashboard）
-const params = new URLSearchParams(window.location.search);
-const fromQuery = params.get("next");
-const fromStorage = localStorage.getItem("mgpt_return_to");
-
-const next =
-(fromQuery && safePath(fromQuery)) ||
-(fromStorage && safePath(fromStorage)) ||
-"/dashboard";
-
-localStorage.removeItem("mgpt_return_to");
-
-// ✅ ここはまず「確実に動く」優先（白画面回避）
-window.location.replace(next);
+await signInWithEmailAndPassword(auth, email, pw);
+window.location.replace("/dashboard");
 } catch (e2) {
 console.error("[Login] error", e2);
 setMsg(`${e2.code || "error"}: ${e2.message || e2.toString()}`);
@@ -58,38 +30,6 @@ setMsg(`${e2.code || "error"}: ${e2.message || e2.toString()}`);
 setLoading(false);
 }
 };
-
-// 外部URL等への遷移を防ぐ簡易ガード
-function safePath(p) {
-try {
-if (!p || typeof p !== "string") return null;
-if (!p.startsWith("/")) return null;
-if (p.startsWith("/login")) return null;
-return p;
-} catch {
-return null;
-}
-}
-
-// ✅ iOSの「一瞬null」揺れ対策：最大timeoutMsだけ user を待つ
-function waitForUserSettled(timeoutMs = 2000) {
-return new Promise((resolve) => {
-if (auth.currentUser) return resolve();
-
-const t = setTimeout(() => {
-unsub?.();
-resolve();
-}, timeoutMs);
-
-const unsub = onAuthStateChanged(auth, (u) => {
-if (u) {
-clearTimeout(t);
-unsub();
-resolve();
-}
-});
-});
-}
 
 return (
 <div className="auth-wrap">
