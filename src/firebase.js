@@ -1,20 +1,17 @@
-// src/firebase.js
-import { initializeApp } from "firebase/app";
+// src/firebase.js (CRA + Firebase v9 modular, iOS-friendly persistence)
 
+import { initializeApp, getApps } from "firebase/app";
 import {
 getAuth,
 onAuthStateChanged,
 setPersistence,
+indexedDBLocalPersistence,
 browserLocalPersistence,
+browserSessionPersistence,
 } from "firebase/auth";
-
-// （必要なら）Firestoreも使うので export します
 import { getFirestore } from "firebase/firestore";
 
-/**
-* CRA(Create React App) は
-* 環境変数が REACT_APP_ で始まる必要があります。
-*/
+// --- env (CRA) ---
 const firebaseConfig = {
 apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
 authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -24,42 +21,66 @@ messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
 appId: process.env.REACT_APP_FIREBASE_APP_ID,
 };
 
-// もし env が未設定だと iPhone などで「読み込み中…」のままになりがちなので早期に分かるようにします
+// --- basic validation ---
 const missing = Object.entries(firebaseConfig)
 .filter(([, v]) => !v)
 .map(([k]) => k);
 
 if (missing.length) {
-// eslint-disable-next-line no-console
-console.error("[firebase] Missing env vars:", missing.join(", "));
+console.error("[firebase] Missing env vars:", missing);
 }
 
-export const app = initializeApp(firebaseConfig);
+// --- init app (avoid double init in dev/HMR) ---
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
+// --- exports ---
 export const auth = getAuth(app);
-
-/**
-* ✅ ログイン保持（永続化）
-* これが無いと iOS Safari で保持されなかったり、
-* 状況によっては「読み込み中…」のままになりやすいです。
-*
-* ※ Promise ですが、アプリ全体を止めないため await はしません
-*/
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-// eslint-disable-next-line no-console
-console.warn("[firebase] setPersistence failed:", err?.code, err?.message);
-});
-
 export const db = getFirestore(app);
 
 /**
-* authReady:
-* - onAuthStateChanged が1回発火したタイミングで resolve
-* - ルーティング側で「認証状態確定まで待つ」用途
+* iOS Safari は状況次第で IndexedDB が不安定なことがあるので、
+* 1) indexedDB → 2) localStorage → 3) session の順でフォールバック
+*
+* 重要：ログイン前にこれが完了している必要がある
 */
+async function ensurePersistence() {
+// すでにセット済みでも害はないが、失敗時のfallbackのため毎回tryする
+const candidates = [
+{ name: "indexedDBLocalPersistence", value: indexedDBLocalPersistence },
+{ name: "browserLocalPersistence", value: browserLocalPersistence },
+{ name: "browserSessionPersistence", value: browserSessionPersistence },
+];
+
+for (const p of candidates) {
+try {
+await setPersistence(auth, p.value);
+console.log(`[firebase] persistence set: ${p.name}`);
+return p.name;
+} catch (e) {
+console.warn(`[firebase] persistence failed: ${p.name}`, e);
+}
+}
+
+// ここまで来たらかなり異常（Cookieブロック/プライベートなど）
+console.error("[firebase] Could not set any persistence.");
+return null;
+}
+
+/**
+* auth復元が終わったかどうかを外部から待てるようにする
+*/
+let _authReadyResolve;
 export const authReady = new Promise((resolve) => {
-const unsubscribe = onAuthStateChanged(auth, () => {
-unsubscribe();
-resolve(true);
+_authReadyResolve = resolve;
 });
+
+// ここが超重要：起動時に必ず persistence → onAuthStateChanged の順にする
+(async () => {
+await ensurePersistence();
+
+onAuthStateChanged(auth, (user) => {
+// user が null でも「復元処理が終わった」ことが重要
+window.__MENTALGPT_USER__ = user ? { uid: user.uid, email: user.email } : null;
+_authReadyResolve(user);
 });
+})();
