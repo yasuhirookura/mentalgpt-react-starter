@@ -1,13 +1,10 @@
 // src/LoginForm.jsx
 import React, { useState } from "react";
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
 import { auth, authReady } from "./firebase";
 import "./LoginForm.css";
 
 export default function LoginForm() {
-const navigate = useNavigate();
-
 const [email, setEmail] = useState("");
 const [pw, setPw] = useState("");
 const [msg, setMsg] = useState("");
@@ -25,14 +22,14 @@ return;
 try {
 setLoading(true);
 
-// ✅ persistence 設定＆初回復元を確定（firebase.js側の処理を待つ）
+// ✅ persistence 設定＆初回復元を確定（firebase.js側を待つ）
 await authReady;
 
 // ✅ ログイン
 const cred = await signInWithEmailAndPassword(auth, email, pw);
 console.log("[Login] success uid=", cred?.user?.uid);
 
-// ✅ iOS Safari 対策：トークン確定を待つ（軽くでOK）
+// ✅ iOS Safari 対策：トークン確定を待つ
 try {
 await cred.user.getIdToken(true);
 } catch {}
@@ -44,6 +41,7 @@ await waitForUserSettled(2000);
 const params = new URLSearchParams(window.location.search);
 const fromQuery = params.get("next");
 const fromStorage = localStorage.getItem("mgpt_return_to");
+
 const next =
 (fromQuery && safePath(fromQuery)) ||
 (fromStorage && safePath(fromStorage)) ||
@@ -51,8 +49,8 @@ const next =
 
 localStorage.removeItem("mgpt_return_to");
 
-// ✅ フルリロードを避けて SPA 遷移
-navigate(next, { replace: true });
+// ✅ ここはまず「確実に動く」優先（白画面回避）
+window.location.replace(next);
 } catch (e2) {
 console.error("[Login] error", e2);
 setMsg(`${e2.code || "error"}: ${e2.message || e2.toString()}`);
@@ -76,7 +74,6 @@ return null;
 // ✅ iOSの「一瞬null」揺れ対策：最大timeoutMsだけ user を待つ
 function waitForUserSettled(timeoutMs = 2000) {
 return new Promise((resolve) => {
-// すでに user がいるなら即OK
 if (auth.currentUser) return resolve();
 
 const t = setTimeout(() => {
