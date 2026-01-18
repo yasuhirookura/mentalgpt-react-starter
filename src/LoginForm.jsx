@@ -21,6 +21,7 @@ return;
 
 try {
 setLoading(true);
+await authReady;
 await signInWithEmailAndPassword(auth, email, pw);
 window.location.replace("/dashboard");
 } catch (e2) {
