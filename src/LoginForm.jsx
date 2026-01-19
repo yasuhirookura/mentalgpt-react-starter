@@ -1,7 +1,7 @@
 // src/LoginForm.jsx
 import React, { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth, authReady } from "./firebase"; // ←同じ階層ならこれ
+import { auth, authReady } from "./firebase"; // ← 同じ階層でOK
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -11,15 +11,27 @@ export default function LoginForm() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
+    console.log("[Login] submit clicked");
+    console.log("[Login] email =", email);
+
     setLoading(true);
     setError("");
 
     try {
-      await authReady; // ← 重要：初期化（特にiPhone/Safariで効く）
-      await signInWithEmailAndPassword(auth, email, password);
+      console.log("[Login] waiting authReady...");
+      await authReady; // ← Safari / iOS 対策の要
+      console.log("[Login] authReady resolved");
+
+      console.log("[Login] try signInWithEmailAndPassword");
+      const result = await signInWithEmailAndPassword(auth, email, password);
+
+      console.log("[Login] signIn success", result.user?.uid);
     } catch (err) {
+      console.error("[Login] signIn error", err);
       setError(err?.message || "ログインに失敗しました");
     } finally {
+      console.log("[Login] finished");
       setLoading(false);
     }
   };
@@ -37,6 +49,7 @@ export default function LoginForm() {
           autoComplete="email"
           required
         />
+
         <input
           type="password"
           placeholder="パスワード"
@@ -50,7 +63,11 @@ export default function LoginForm() {
           {loading ? "ログイン中…" : "ログイン"}
         </button>
 
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
+        {error && (
+          <p style={{ color: "crimson", marginTop: 8 }}>
+            {error}
+          </p>
+        )}
       </form>
     </main>
   );
