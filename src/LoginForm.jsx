@@ -17,31 +17,31 @@ export default function LoginForm() {
   }, [email]);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setMsg("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  setMsg("");
 
-    try {
-      // iPhone/Safariで初期化・永続化が間に合わない系対策
-      await authReady;
+  try {
+    await authReady;
 
-      const trimmedEmail = email.trim();
-      await signInWithEmailAndPassword(auth, trimmedEmail, password);
-      // 成功時は通常 onAuthStateChanged 側で画面遷移する想定
-    } catch (err) {
-      const code = err?.code || "";
-      if (code === "auth/invalid-credential") {
-        setError("メールアドレスまたはパスワードが一致しません。念のためパスワード再設定もお試しください。");
-      } else if (code === "auth/too-many-requests") {
-        setError("試行回数が多すぎます。しばらく待ってから再度お試しください。");
-      } else {
-        setError(err?.message || "ログインに失敗しました");
-      }
-    } finally {
-      setLoading(false);
+    const emailTrimmed = email.trim();
+    const passwordTrimmed = password; // パスワードは trim しない
+
+    await signInWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
+  } catch (err) {
+    const code = err?.code || "";
+    if (code === "auth/invalid-credential") {
+      setError("メールアドレスまたはパスワードが一致しません。念のためパスワード再設定もお試しください。");
+    } else if (code === "auth/too-many-requests") {
+      setError("試行回数が多すぎます。しばらく待ってから再度お試しください。");
+    } else {
+      setError(err?.message || "ログインに失敗しました");
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleReset = async (e) => {
     e.preventDefault();
