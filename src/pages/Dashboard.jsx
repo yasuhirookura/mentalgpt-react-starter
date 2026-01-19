@@ -256,7 +256,7 @@ gap: 10,
 margin: "8px 0 4px",
 }}
 >
-<h1 style={{ margin: 0 }}>投稿</h1>
+<h1 style={{ margin: 0 }}>投稿 v20260119-1</h1>
 
 <span style={{ fontSize: 13, color: "#666" }}>
 今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
