@@ -262,13 +262,6 @@ margin: "8px 0 4px",
 今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
 </span>
 
-{/* ✅ デバッグ表示（通常は非表示） */}
-{SHOW_DEBUG && (
-<span style={{ fontSize: 11, color: "#999" }}>
-uid: {userUid || "(未取得)"} {userEmail ? ` / ${userEmail}` : ""} / dayKey: {dayKeyJST()}
-</span>
-)}
-
 <span style={{ marginLeft: "auto", fontSize: 13 }}>
 <Link to="/archive">アーカイブ</Link> / <Link to="/mypage">マイページ</Link>
 </span>
