@@ -61,7 +61,7 @@ export default function SiteFooter() {
         </p>
 
         <p className="copy">
-          © 2025 MentalGPT / Okulab / baseball
+          © 2025-2026 MentalGPT / Okulab / baseball
           <br />
           ※ MentalGPT は医療・診断・治療の代替となるものではありません。<br />
           必要に応じて専門の医師やカウンセラーへご相談ください。<br />
