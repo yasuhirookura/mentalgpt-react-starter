@@ -108,6 +108,7 @@ borderBottom: "8px solid #ccc",
 </div>
 
 <p className="mini-note">
+※しばらく操作しなかった場合、再ログインが必要になる場合があります。<br />
 ※本サービスは医療行為ではありません（診断・治療は行いません）。<br />
 ※AI応答は OpenAI の API（ChatGPT）を活用し、MentalGPTにあわせてアレンジしています。
 </p>
