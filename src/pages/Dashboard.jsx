@@ -1,378 +1,557 @@
 // src/pages/Dashboard.jsx
-import "../styles/Button.css";
-import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import TextareaAutosize from "react-textarea-autosize";
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
-import { auth, authReady, db } from "../firebase";
-
-const MAX = 400;
-const HINTS = [
-"良い回答を考え中です…",
-"言葉を大切に選んでいます…",
-"あなたの気持ちに寄り添っています…",
-"少しだけお待ちください…",
-];
-
-// ✅ デバッグ表示のON/OFF（通常運用は false 推奨）
-const SHOW_DEBUG = false;
-
-function dayKeyJST(d = new Date()) {
-return new Intl.DateTimeFormat("en-CA", {
-timeZone: "Asia/Tokyo",
-year: "numeric",
-month: "2-digit",
-day: "2-digit",
-}).format(d); // YYYY-MM-DD
-}
-
-function toJpDateTime(ts) {
-try {
-const d = ts?.toDate ? ts.toDate() : new Date(ts);
-return d.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
-} catch {
-return "";
-}
-}
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export default function Dashboard() {
-const [text, setText] = useState(localStorage.getItem("draft") || "");
-const [isLoading, setIsLoading] = useState(false);
-const [hint] = useState(() => HINTS[Math.floor(Math.random() * HINTS.length)]);
-
-// Firestoreから読んだ「今日の履歴」をここに表示
-const [messages, setMessages] = useState([]);
-
-// ✅ サーバー基準の回数（ブラウザが変わっても一致する）
-const [todayCount, setTodayCount] = useState(0);
-const [planLimit, setPlanLimit] = useState(10);
-
-// auth表示用
-const [userUid, setUserUid] = useState("");
-const [userEmail, setUserEmail] = useState("");
-
-const endRef = useRef(null);
-
-useEffect(() => {
-localStorage.setItem("draft", text);
-}, [text]);
-
-// 起動：auth確定→購読→ usage + 今日の履歴ロード
-useEffect(() => {
-let unsub = null;
-let alive = true;
-
-(async () => {
-try {
-await authReady;
-if (!alive) return;
-
-unsub = onAuthStateChanged(auth, async (u) => {
-if (!alive) return;
-
-setUserUid(u?.uid || "");
-setUserEmail(u?.email || "");
-
-if (!u) {
-setMessages([]);
-return;
-}
-
-await refreshUsage();
-await reloadTodayFromFirestore(u.uid);
-});
-} catch (e) {
-console.error("[Dashboard] boot error", e);
-}
-})();
-
-return () => {
-alive = false;
-if (unsub) unsub();
-};
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-async function refreshUsage() {
-try {
-const u = auth.currentUser;
-if (!u) return;
-
-const idToken = await u.getIdToken();
-const res = await fetch("/api/usage", {
-method: "GET",
-headers: { Authorization: `Bearer ${idToken}` },
-});
-
-const data = await res.json().catch(() => ({}));
-if (res.ok && data?.usage) {
-setTodayCount(Number(data.usage.usedToday ?? 0));
-setPlanLimit(Number(data.usage.dailyLimit ?? 10));
-} else {
-console.warn("[usage] not ok", res.status, data);
-}
-} catch (e) {
-console.error("[usage] fetch error", e);
-}
-}
-
-async function reloadTodayFromFirestore(uid) {
-try {
-const dk = dayKeyJST();
-const ref = collection(db, "conversations");
-const q = query(
-ref,
-where("uid", "==", uid),
-where("dayKey", "==", dk),
-orderBy("createdAt", "asc"),
-limit(200)
-);
-const snap = await getDocs(q);
-const list = [];
-snap.forEach((doc) => {
-const d = doc.data() || {};
-list.push({
-id: doc.id,
-role: d.role || "system",
-content: d.content || "",
-createdAt: d.createdAt || "",
-});
-});
-setMessages(list);
-setTimeout(() => scrollToBottom(false), 0);
-} catch (e) {
-console.error("[Dashboard] reloadTodayFromFirestore error", e);
-}
-}
-
-async function handleSend() {
-const body = text.trim();
-if (!body) return;
-if (body.length > MAX) return;
-if (isLoading) return;
-
-if (todayCount >= planLimit) {
-alert("本日の上限に達しました。明日またご利用ください。");
-return;
-}
-
-setIsLoading(true);
-setText("");
-localStorage.setItem("draft", "");
-
-// UIは即反映（ただし最終はFirestoreから読み直す）
-const optimistic = {
-id: `tmp_user_${Date.now()}`,
-role: "user",
-content: body,
-createdAt: new Date(),
-};
-setMessages((prev) => [...prev, optimistic]);
-setTimeout(() => scrollToBottom(false), 0);
-
-try {
-await authReady;
-const u = auth.currentUser;
-const idToken = u ? await u.getIdToken() : null;
-
-const res = await fetch("/api/chat", {
-method: "POST",
-headers: {
-"Content-Type": "application/json",
-...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-},
-body: JSON.stringify({ message: body }),
-});
-
-const data = await res.json().catch(() => ({}));
-
-if (!res.ok) {
-const msg =
-data?.message ||
-(data?.error === "daily_limit"
-? "本日の上限に達しました。"
-: `送信に失敗しました（${res.status}）`);
-throw new Error(msg);
-}
-
-// usage更新
-if (data?.usage) {
-setTodayCount(Number(data.usage.usedToday ?? todayCount));
-setPlanLimit(Number(data.usage.dailyLimit ?? planLimit));
-} else {
-await refreshUsage();
-}
-
-// ✅ サーバー側がFirestoreへ保存している前提なので、ここで “今日の履歴” を再同期するのが安全
-if (u?.uid) {
-await reloadTodayFromFirestore(u.uid);
-} else {
-// いちおう画面だけ追加
-const aiMsg = {
-id: `tmp_ai_${Date.now()}`,
-role: "ai",
-content: data.text ?? data.content ?? "(応答なし)",
-createdAt: new Date(),
-};
-setMessages((prev) => [...prev, aiMsg]);
-}
-
-setTimeout(() => scrollToBottom(), 0);
-} catch (e) {
-console.error("[send] error", e);
-setMessages((prev) => [
-...prev,
+const [pet, setPet] = useState("dog"); // dog | cat
+const [tone, setTone] = useState("auto"); // auto | polite | casual
+const [text, setText] = useState("");
+const [messages, setMessages] = useState(() => {
+const now = formatDateTime(new Date());
+return [
 {
-id: `err_${Date.now()}`,
-role: "system",
-content: e?.message || "送信に失敗しました。もう一度お試しください。",
-createdAt: new Date(),
+id: cryptoId(),
+role: "pet",
+pet: "dog",
+author: "ワンコ",
+at: now,
+content:
+"ワンコだよ。ここはUIのモック画面！\n犬/猫を切り替えて、投稿→返答の見た目を確認してね。",
+},
+];
+});
+
+const listRef = useRef(null);
+
+const petLabel = pet === "dog" ? "犬" : "猫";
+const petEmoji = pet === "dog" ? "🐶" : "🐱";
+const petName = pet === "dog" ? "ワンコ" : "ニャンコ";
+const petImg = pet === "dog" ? "/img/dog_1.png" : "/img/cat_1.png";
+
+const canSend = text.trim().length > 0 && text.length <= 400;
+
+useEffect(() => {
+// 下にスクロール
+const el = listRef.current;
+if (!el) return;
+el.scrollTop = el.scrollHeight;
+}, [messages.length]);
+
+const helperText = useMemo(() => {
+if (tone === "auto") return "口調：自動（ユーザー文から判定）";
+if (tone === "polite") return "口調：丁寧";
+return "口調：カジュアル";
+}, [tone]);
+
+function onSend() {
+if (!canSend) return;
+
+const userMsg = {
+id: cryptoId(),
+role: "user",
+pet,
+author: "あなた",
+at: formatDateTime(new Date()),
+content: text.trim(),
+};
+
+// 返答（モック）
+const reply = mockReply(text.trim(), pet, tone);
+
+const petMsg = {
+id: cryptoId(),
+role: "pet",
+pet,
+author: petName,
+at: formatDateTime(new Date()),
+content: reply,
+};
+
+setMessages((prev) => [...prev, userMsg, petMsg]);
+setText("");
+}
+
+function onClear() {
+const now = formatDateTime(new Date());
+setMessages([
+{
+id: cryptoId(),
+role: "pet",
+pet,
+author: petName,
+at: now,
+content:
+`${petName}だよ。会話をクリアしたよ。\n気軽に話しかけてね。`,
 },
 ]);
-setTimeout(() => scrollToBottom(), 0);
-} finally {
-setIsLoading(false);
+}
+
+function setSample(kind) {
+if (kind === "polite") {
+setTone("polite");
+setText("今日はちょっと疲れました。やさしく話を聞いてほしいです。");
+} else {
+setTone("casual");
+setText("なんかモヤモヤする〜。ちょい元気出したい！");
 }
 }
 
-function scrollToBottom(smooth = true) {
-const el = endRef.current;
-if (!el) return;
-el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+function onKeyDown(e) {
+if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+onSend();
 }
-
-const over = text.length > MAX;
-const remain = Math.max(planLimit - todayCount, 0);
+}
 
 return (
-<main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
-<header
-style={{
-display: "flex",
-flexWrap: "wrap",
-alignItems: "baseline",
-gap: 10,
-margin: "8px 0 4px",
-}}
->
-<h1 style={{ margin: 0 }}>投稿</h1>
+<div className="pgpt">
+<style>{css}</style>
 
-<span style={{ fontSize: 13, color: "#666" }}>
-今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
-</span>
-
-<span style={{ marginLeft: "auto", fontSize: 13 }}>
-<Link to="/archive">アーカイブ</Link> / <Link to="/mypage">マイページ</Link>
-</span>
-</header>
-
-{/* 会話（今日の履歴） */}
-<div
-style={{
-border: "1px solid #e5e7eb",
-borderRadius: 12,
-padding: "12px",
-minHeight: "52vh",
-maxHeight: "72vh",
-overflowY: "auto",
-background: "#fff",
-display: "flex",
-flexDirection: "column",
-gap: 10,
-}}
->
-{messages.length === 0 && (
-<p style={{ color: "#888", textAlign: "center", margin: "12px 0" }}>
-直近の履歴はここに表示されます。下の入力欄から気持ちを書いてみてください。
-</p>
-)}
-
-{messages.map((m) => (
-<MessageBubble key={m.id} role={m.role} content={m.content} createdAt={m.createdAt} />
-))}
-
-<div ref={endRef} />
+{/* Header */}
+<div className="pgpt__header">
+<div className="pgpt__titleArea">
+<div className="pgpt__title">PetGPT</div>
+<div className="pgpt__badge">β版 UI mock</div>
 </div>
 
-{/* 入力エリア */}
-<div style={{ position: "sticky", bottom: 8, marginTop: 8 }}>
-<div
-style={{
-display: "flex",
-gap: 8,
-alignItems: "flex-end",
-background: "#f9fafb",
-border: "1px solid #e5e7eb",
-borderRadius: 12,
-padding: 10,
-}}
+<div className="pgpt__headerRight">
+<div className="pgpt__tone">{helperText}</div>
+
+<div className="pgpt__seg" role="tablist" aria-label="pet selector">
+<button
+className={`pgpt__segBtn ${pet === "dog" ? "isActive" : ""}`}
+onClick={() => setPet("dog")}
+type="button"
 >
-<TextareaAutosize
+🐶 <span>犬</span>
+</button>
+<button
+className={`pgpt__segBtn ${pet === "cat" ? "isActive" : ""}`}
+onClick={() => setPet("cat")}
+type="button"
+>
+🐱 <span>猫</span>
+</button>
+</div>
+</div>
+</div>
+
+{/* Chat list */}
+<div className="pgpt__list" ref={listRef}>
+{messages.map((m) => (
+<div
+key={m.id}
+className={`pgpt__row ${m.role === "user" ? "isUser" : "isPet"}`}
+>
+{/* 左のアイコン */}
+{m.role === "pet" ? (
+<div className="pgpt__avatarWrap">
+<div className="pgpt__avatar">
+<img src={m.pet === "dog" ? "/img/dog_1.png" : "/img/cat_1.png"} alt={m.pet} />
+</div>
+</div>
+) : (
+<div className="pgpt__avatarWrap">
+<div className="pgpt__avatar pgpt__avatar--user">
+<span>🙂</span>
+</div>
+</div>
+)}
+
+<div className="pgpt__bubbleArea">
+<div className="pgpt__meta">
+<span className="pgpt__author">
+{m.role === "pet" ? (m.pet === "dog" ? "ワンコ" : "ニャンコ") : "あなた"}
+</span>
+<span className="pgpt__dot">・</span>
+<span className="pgpt__time">{m.at}</span>
+</div>
+
+<div className={`pgpt__bubble ${m.role === "user" ? "isUser" : "isPet"}`}>
+{m.content.split("\n").map((line, idx) => (
+<p key={idx} className="pgpt__p">
+{line}
+</p>
+))}
+</div>
+</div>
+</div>
+))}
+</div>
+
+{/* Composer */}
+<div className="pgpt__composer">
+<div className="pgpt__inputRow">
+<textarea
+className="pgpt__input"
+placeholder="今の気分や、話したいことをどうぞ（400文字まで）"
 value={text}
 onChange={(e) => setText(e.target.value)}
-placeholder="今の気分や、頭に浮かんだことを、自由にどうぞ（400文字まで）"
-minRows={2}
-maxRows={10}
-style={{
-flex: 1,
-border: "none",
-outline: "none",
-resize: "none",
-background: "transparent",
-lineHeight: 1.8,
-fontSize: 16,
-}}
+onKeyDown={onKeyDown}
+maxLength={400}
 />
-
 <button
+className="pgpt__send"
+onClick={onSend}
+disabled={!canSend}
 type="button"
-aria-label="送信"
-onClick={handleSend}
-disabled={isLoading || !text.trim() || over || todayCount >= planLimit}
-title={over ? "文字数が多すぎます" : "送信"}
-className="sendButton"
 >
-<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-<circle cx="24" cy="24" r="23" />
-<polygon points="18,12 36,24 18,36" fill="white" />
-</svg>
+送信
 </button>
 </div>
 
-<div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-<span style={{ fontSize: 12, color: over ? "#c00" : "#666" }}>
-{Math.min(text.length, MAX)} / {MAX}
-</span>
-{isLoading && <span style={{ fontSize: 12, color: "#0a6cff", marginLeft: 8 }}>{hint}</span>}
+<div className="pgpt__bottomRow">
+<div className="pgpt__count">
+{text.length} / 400
+</div>
+
+<div className="pgpt__actions">
+<button className="pgpt__chip" type="button" onClick={() => setSample("polite")}>
+丁寧サンプル
+</button>
+<button className="pgpt__chip" type="button" onClick={() => setSample("casual")}>
+カジュアルサンプル
+</button>
+<button className="pgpt__chip danger" type="button" onClick={onClear}>
+会話をクリア
+</button>
 </div>
 </div>
-</main>
+
+<div className="pgpt__hint">
+⌘/Ctrl + Enter で送信
+</div>
+</div>
+</div>
 );
 }
 
-/* ------ バブル ------ */
-function MessageBubble({ role, content, createdAt }) {
-const isUser = role === "user";
-return (
-<div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
-<div
-style={{
-background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
-border: "1px solid #e5e7eb",
-padding: "10px 12px",
-borderRadius: 12,
-maxWidth: "85%",
-lineHeight: 1.8,
-whiteSpace: "pre-wrap",
-wordBreak: "break-word",
-}}
->
-<div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-{isUser ? "あなた" : role === "ai" ? "MentalGPT" : "システム"} ・ {toJpDateTime(createdAt)}
-</div>
-<div>{content}</div>
-</div>
-</div>
-);
+/* ---------------- helpers ---------------- */
+
+function mockReply(userText, pet, tone) {
+const isDog = pet === "dog";
+
+// tone auto: 末尾が「です/ます」っぽいなら丁寧
+const autoPolite = /です|ます|ください|でしょうか/.test(userText);
+const effectiveTone = tone === "auto" ? (autoPolite ? "polite" : "casual") : tone;
+
+if (effectiveTone === "polite") {
+return isDog
+? `承知しました。\n${pick([
+"無理しすぎていませんか？",
+"少し休める時間はありますか？",
+"今いちばんつらいのは、どの部分でしょう？",
+])}\n（※ここはモック返答です）`
+: `かしこまりました。\n${pick([
+"その気持ち、ちゃんと大事にしてね。",
+"いま必要なのは、休憩？それとも整理？",
+"少しだけ状況を教えてもらってもいい？",
+])}\n（※ここはモック返答です）`;
 }
+
+// casual
+return isDog
+? `うんうん、わかる〜。\n${pick([
+"今日はえらい！まず深呼吸しよ。",
+"いま一番モヤるポイントどこ？",
+"小さいことでもOK、吐き出して〜。",
+])}\n（※ここはモック返答だよ）`
+: `うん、あるある。\n${pick([
+"まず温かい飲み物でもいこ？",
+"その話、もうちょい聞かせて。",
+"焦らなくて大丈夫。いま何が一番しんどい？",
+])}\n（※ここはモック返答にゃ）`;
+}
+
+function pick(arr) {
+return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function formatDateTime(d) {
+const pad = (n) => String(n).padStart(2, "0");
+return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(
+d.getHours()
+)}:${pad(d.getMinutes())}`;
+}
+
+function cryptoId() {
+// Safariでも動く程度に
+try {
+return crypto.randomUUID();
+} catch {
+return String(Date.now()) + "_" + String(Math.random()).slice(2);
+}
+}
+
+/* ---------------- CSS ---------------- */
+
+const css = `
+.pgpt{
+min-height: 100vh;
+background: #f6f7fb;
+display: flex;
+flex-direction: column;
+}
+
+.pgpt__header{
+position: sticky;
+top: 0;
+z-index: 10;
+background: #ffffffcc;
+backdrop-filter: blur(10px);
+border-bottom: 1px solid #e9ecf3;
+padding: 14px 14px 10px;
+display: flex;
+gap: 12px;
+align-items: center;
+justify-content: space-between;
+}
+
+.pgpt__titleArea{
+display:flex;
+flex-direction: column;
+gap: 6px;
+}
+
+.pgpt__title{
+font-size: 26px;
+font-weight: 800;
+letter-spacing: 0.2px;
+}
+
+.pgpt__badge{
+display:inline-flex;
+width: fit-content;
+font-size: 12px;
+font-weight: 700;
+background: #e7f0ff;
+color: #0a6cff;
+padding: 6px 10px;
+border-radius: 999px;
+}
+
+.pgpt__headerRight{
+display:flex;
+flex-direction: column;
+gap: 8px;
+align-items: flex-end;
+}
+
+.pgpt__tone{
+font-size: 12px;
+color: #667085;
+}
+
+.pgpt__seg{
+background: #f1f4fa;
+border: 1px solid #e5e7ef;
+border-radius: 999px;
+padding: 4px;
+display:flex;
+gap: 4px;
+}
+
+.pgpt__segBtn{
+border: 0;
+background: transparent;
+padding: 8px 12px;
+border-radius: 999px;
+font-size: 14px;
+font-weight: 800;
+color: #667085;
+display:flex;
+gap: 6px;
+align-items: center;
+}
+
+.pgpt__segBtn.isActive{
+background: #0a6cff;
+color: #fff;
+box-shadow: 0 6px 18px rgba(10,108,255,0.22);
+}
+
+.pgpt__segBtn span{
+font-weight: 800;
+}
+
+.pgpt__list{
+flex: 1;
+padding: 16px 12px 10px;
+overflow: auto;
+}
+
+.pgpt__row{
+display:flex;
+gap: 10px;
+align-items: flex-start;
+margin: 0 auto 14px;
+max-width: 820px;
+}
+
+.pgpt__avatarWrap{
+width: 64px;
+flex: 0 0 64px;
+display:flex;
+justify-content: center;
+}
+
+.pgpt__avatar{
+width: 58px;
+height: 58px;
+border-radius: 999px;
+background: #f2f4f8;
+border: 1px solid #e5e7ef;
+overflow: hidden;
+display:flex;
+align-items: center;
+justify-content: center;
+}
+
+/* ここが「犬を大きく、上寄せ、右の空き減らす」の要点 */
+.pgpt__avatar img{
+width: 150%;
+height: 150%;
+object-fit: contain;
+transform: translateY(-8px);
+}
+
+.pgpt__avatar--user{
+background: #ffffff;
+}
+
+.pgpt__bubbleArea{
+flex: 1;
+}
+
+.pgpt__meta{
+font-size: 12px;
+color: #7a8194;
+margin: 0 0 6px;
+display:flex;
+gap: 6px;
+align-items: center;
+}
+
+.pgpt__author{
+font-weight: 700;
+}
+
+.pgpt__dot{
+opacity: 0.6;
+}
+
+.pgpt__bubble{
+background: #fff;
+border: 1px solid #e5e7ef;
+border-radius: 18px;
+padding: 12px 14px;
+line-height: 1.5;
+box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+width: fit-content;
+max-width: 640px;
+}
+
+.pgpt__bubble.isUser{
+background: #0a6cff0f;
+border-color: #0a6cff33;
+}
+
+.pgpt__p{
+margin: 0;
+white-space: pre-wrap;
+}
+
+.pgpt__composer{
+background: #fff;
+border-top: 1px solid #e9ecf3;
+padding: 12px;
+}
+
+.pgpt__inputRow{
+max-width: 820px;
+margin: 0 auto;
+display:flex;
+gap: 10px;
+align-items: stretch;
+}
+
+.pgpt__input{
+flex: 1;
+min-height: 58px;
+max-height: 160px;
+resize: vertical;
+border: 1px solid #e5e7ef;
+border-radius: 16px;
+padding: 14px 14px;
+font-size: 16px;
+outline: none;
+}
+
+.pgpt__input:focus{
+border-color: #0a6cff66;
+box-shadow: 0 0 0 4px rgba(10,108,255,0.10);
+}
+
+.pgpt__send{
+width: 92px;
+border: 0;
+border-radius: 16px;
+background: #0a6cff;
+color: #fff;
+font-weight: 800;
+font-size: 16px;
+}
+
+.pgpt__send:disabled{
+opacity: 0.45;
+}
+
+.pgpt__bottomRow{
+max-width: 820px;
+margin: 10px auto 0;
+display:flex;
+justify-content: space-between;
+gap: 10px;
+align-items: center;
+}
+
+.pgpt__count{
+color: #7a8194;
+font-size: 13px;
+}
+
+.pgpt__actions{
+display:flex;
+gap: 8px;
+flex-wrap: wrap;
+justify-content: flex-end;
+}
+
+.pgpt__chip{
+border: 1px solid #e5e7ef;
+background: #fff;
+border-radius: 999px;
+padding: 8px 12px;
+font-weight: 700;
+font-size: 13px;
+}
+
+.pgpt__chip.danger{
+border-color: #ffd4d4;
+}
+
+.pgpt__hint{
+max-width: 820px;
+margin: 8px auto 0;
+font-size: 12px;
+color: #98a2b3;
+text-align: right;
+}
+
+/* モバイル微調整 */
+@media (max-width: 480px){
+.pgpt__title{ font-size: 24px; }
+.pgpt__avatarWrap{ width: 56px; flex-basis: 56px; }
+.pgpt__avatar{ width: 52px; height: 52px; }
+.pgpt__bubble{ max-width: 72vw; }
+.pgpt__send{ width: 86px; }
+}
+`;
