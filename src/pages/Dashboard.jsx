@@ -221,11 +221,20 @@ border: 1px solid rgba(15,23,42,0.06);
 }
 
 .pgpt__avatar{
+width: 88%;
+height: 88%;
+object-fit: contain;
+display:block;
+}
+
+/*
+.pgpt__avatar{
 width: 72%;
 height: 72%;
 object-fit: contain;
 display:block;
 }
+*/
 
 .pgpt__bubbleArea{
 flex: 1;
