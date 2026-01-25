@@ -221,8 +221,8 @@ border: 1px solid rgba(15,23,42,0.06);
 }
 
 .pgpt__avatar{
-width: 88%;
-height: 88%;
+width: 100%;
+height: 100%;
 object-fit: contain;
 display:block;
 }
