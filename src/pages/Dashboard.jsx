@@ -221,8 +221,8 @@ border: 1px solid rgba(15,23,42,0.06);
 }
 
 .pgpt__avatar{
-width: 100%;
-height: 100%;
+width: 120%;
+height: 120%;
 object-fit: contain;
 display:block;
 }
@@ -345,8 +345,8 @@ width: 126px;
 height: 126px;
 }
 .pgpt__avatar{
-width: 78%;
-height: 78%;
+width: 120%;
+height: 120%;
 }
 .pgpt__list{
 max-height: 58vh;
