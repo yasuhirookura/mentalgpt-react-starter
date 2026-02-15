@@ -222,11 +222,15 @@ export default async function handler(req, res) {
 
     // ✅ ④ 履歴を保存（ユーザー投稿 → AI返信）
     try {
-      await saveConversation({ uid, role: "user", content: userMessage });
-      await saveConversation({ uid, role: "ai", content: text });
-    } catch (e) {
-      console.error("[api/chat] saveConversation failed", e);
-    }
+  await saveConversation({ uid, role: "user", content: userMessage });
+  await saveConversation({ uid, role: "ai", content: text });
+} catch (e) {
+  console.error("[api/chat] saveConversation failed", e);
+  return res.status(500).json({
+    error: "save_failed",
+    detail: String(e?.message || e)
+  });
+}
 
     return res.status(200).json({
       text,
