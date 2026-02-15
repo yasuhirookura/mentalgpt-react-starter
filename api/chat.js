@@ -43,10 +43,6 @@ function getJstDateString() {
 
 /**
  * users/{uid} の fields を使って日次回数を管理
- * - usageDate: "YYYY-MM-DD"
- * - usedToday: number
- * - plan: "light" | "standard" | "free" | ...
- * - dailyLimit: number (あれば優先)
  */
 async function checkAndIncrementDailyUsage(uid) {
   const today = getJstDateString();
@@ -103,6 +99,45 @@ async function saveConversation({ uid, role, content }) {
   });
 }
 
+/**
+ * ✅ 直近の会話履歴を Firestore から取得
+ * - sameDayOnly=true なら今日分のみ
+ * - limitN は「合計メッセージ数」(user+ai をまとめてN件)
+ */
+async function loadRecentConversation({ uid, limitN = 20, sameDayOnly = true }) {
+  const today = getJstDateString();
+
+  let q = db.collection("conversations").where("uid", "==", uid);
+  if (sameDayOnly) q = q.where("dayKey", "==", today);
+
+  // createdAt desc で直近N件
+  q = q.orderBy("createdAt", "desc").limit(limitN);
+
+  const snap = await q.get();
+
+  // desc で取ってるので、OpenAIに渡すため asc に戻す
+  const rows = [];
+  snap.forEach((doc) => {
+    const d = doc.data() || {};
+    rows.push({
+      role: d.role,
+      content: d.content,
+      createdAt: d.createdAt,
+    });
+  });
+  rows.reverse();
+
+  // OpenAI用 role 変換（Firestore: "ai" → OpenAI: "assistant"）
+  const messages = rows
+    .filter((m) => (m.role === "user" || m.role === "ai") && typeof m.content === "string")
+    .map((m) => ({
+      role: m.role === "ai" ? "assistant" : "user",
+      content: m.content,
+    }));
+
+  return messages;
+}
+
 export default async function handler(req, res) {
   cors(res);
 
@@ -139,11 +174,29 @@ export default async function handler(req, res) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
 
+    // ✅ ここが本丸：Firestoreから履歴を読み、今回の質問の前に積む
+    // まずは「今日分のみ」「直近20件」くらいが安全
+    let history = [];
+    try {
+      history = await loadRecentConversation({ uid, limitN: 20, sameDayOnly: true });
+    } catch (e) {
+      console.error("[api/chat] loadRecentConversation failed", e);
+      history = [];
+    }
+
+    // ✅ system は「履歴を踏まえてOK」な文に（“覚えていません”固定文は入れない）
+    const systemPrompt =
+      "あなたは優しく簡潔に寄り添うメンタルサポーターです。"
+      + " 以下の会話履歴（このユーザーの過去の投稿とあなたの返答）が与えられている場合は、"
+      + " その範囲で文脈を踏まえて自然に会話してください。"
+      + " 履歴にないことは推測せず、必要なら質問してください。";
+
     const payload = {
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "あなたは優しく簡潔に寄り添うメンタルサポーターです。" },
-        { role: "user", content: userMessage },
+        { role: "system", content: systemPrompt },
+        ...history, // ← ここに直近履歴が入る（user/assistant）
+        { role: "user", content: userMessage }, // ← 最後に今回
       ],
       temperature: 0.7,
       max_tokens: 350,
@@ -168,12 +221,10 @@ export default async function handler(req, res) {
     const text = data.choices?.[0]?.message?.content?.trim() || "（応答を取得できませんでした）";
 
     // ✅ ④ 履歴を保存（ユーザー投稿 → AI返信）
-    // ※ ここが今回の本丸
     try {
       await saveConversation({ uid, role: "user", content: userMessage });
       await saveConversation({ uid, role: "ai", content: text });
     } catch (e) {
-      // 保存失敗しても返信は返す（致命傷回避）
       console.error("[api/chat] saveConversation failed", e);
     }
 
