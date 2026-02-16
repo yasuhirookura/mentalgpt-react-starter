@@ -228,7 +228,7 @@ export default async function handler(req, res) {
   console.error("[api/chat] saveConversation failed", e);
   return res.status(500).json({
     error: "save_failed",
-    detail: String(e?.message || e)
+    detail: String(e?.message || e),
   });
 }
 
