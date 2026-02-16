@@ -16,9 +16,8 @@ const HINTS = [
 "少しだけお待ちください…",
 ];
 
-// ✅ 点検モード（通常運用は false 推奨）
-// まずは true にして「点検: 最新10件」ボタンが出るか確認してください
-const SHOW_DEBUG = true;
+// ✅ デバッグ表示のON/OFF（通常運用は false 推奨）
+const SHOW_DEBUG = false;
 
 function dayKeyJST(d = new Date()) {
 return new Intl.DateTimeFormat("en-CA", {
@@ -119,6 +118,7 @@ console.error("[usage] fetch error", e);
 }
 }
 
+// ✅ 通常運用: 今日（dayKey=今日）の履歴だけ表示
 async function reloadTodayFromFirestore(uid) {
 try {
 const dk = dayKeyJST();
@@ -130,6 +130,7 @@ where("dayKey", "==", dk),
 orderBy("createdAt", "asc"),
 limit(200)
 );
+
 const snap = await getDocs(q);
 const list = [];
 snap.forEach((doc) => {
@@ -139,9 +140,9 @@ id: doc.id,
 role: d.role || "system",
 content: d.content || "",
 createdAt: d.createdAt || "",
-dayKey: d.dayKey || "",
 });
 });
+
 setMessages(list);
 setTimeout(() => scrollToBottom(false), 0);
 } catch (e) {
@@ -149,13 +150,13 @@ console.error("[Dashboard] reloadTodayFromFirestore error", e);
 }
 }
 
-/* ===== 点検: 直近10件（このユーザーの最新10件） ===== */
+// ✅ 点検: 直近10件（このユーザーの最新10件）
 async function debugLoadLatestForUser(uid) {
 try {
 const ref = collection(db, "conversations");
 const q = query(ref, where("uid", "==", uid), orderBy("createdAt", "desc"), limit(10));
-const snap = await getDocs(q);
 
+const snap = await getDocs(q);
 const list = [];
 snap.forEach((doc) => {
 const d = doc.data() || {};
@@ -242,7 +243,7 @@ setPlanLimit(Number(data.usage.dailyLimit ?? planLimit));
 await refreshUsage();
 }
 
-// ✅ サーバー側がFirestoreへ保存している前提なので、ここで “今日の履歴” を再同期するのが安全
+// ✅ サーバー側がFirestoreへ保存している前提なので、ここで “今日の履歴” を再同期
 if (u?.uid) {
 await reloadTodayFromFirestore(u.uid);
 } else {
@@ -296,11 +297,11 @@ margin: "8px 0 4px",
 >
 <h1 style={{ margin: 0 }}>投稿</h1>
 
-{/* ===== 点検ボタン（SHOW_DEBUG=true の時だけ表示） ===== */}
+{/* ✅ 点検ボタン（SHOW_DEBUG=true のときだけ表示） */}
 {SHOW_DEBUG && userUid && (
 <button
 type="button"
-style={{ fontSize: 12, padding: "4px 8px" }}
+style={{ marginLeft: 10, fontSize: 12 }}
 onClick={() => debugLoadLatestForUser(userUid)}
 >
 点検: 最新10件
