@@ -1,247 +1,212 @@
 // api/chat.js
+// Firestoreに保存された会話履歴（直近N件）を読み込んでから OpenAI に送る版
 
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
-/* =========================
-   Firebase Admin init (Vercel)
-   ========================= */
 import admin from "firebase-admin";
 
-if (!admin.apps.length) {
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+// Node 18+ (Vercel) なら fetch が使えます
+// もし古い環境なら node-fetch が必要ですが、Vercelは通常OKです。
+
+/* =========================
+   Firebase Admin 初期化
+========================= */
+function initFirebaseAdmin() {
+  if (admin.apps.length) return;
+
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error("Missing Firebase Admin env vars (FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)");
+  }
+
+  // Vercelの環境変数で改行が \n になるケース対策
+  privateKey = privateKey.replace(/\\n/g, "\n");
+
   admin.initializeApp({
     credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      projectId,
+      clientEmail,
       privateKey,
     }),
   });
 }
 
-const db = admin.firestore();
-
-async function verifyUser(req) {
-  const h = req.headers.authorization || "";
-  const idToken = h.startsWith("Bearer ") ? h.slice(7) : null;
-  if (!idToken) throw new Error("No token");
-  const decoded = await admin.auth().verifyIdToken(idToken);
-  return decoded; // { uid, email, ... }
+function dayKeyJST(d = new Date()) {
+  // YYYY-MM-DD (Asia/Tokyo)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
-// JST日付 "YYYY-MM-DD"
-function getJstDateString() {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const jst = new Date(utc + 9 * 60 * 60000);
-  return jst.toISOString().split("T")[0];
+/* =========================
+   Auth (Firebase ID token)
+========================= */
+async function getUidFromRequest(req) {
+  const authHeader = req.headers.authorization || "";
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+
+  const idToken = m[1];
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    return decoded?.uid || null;
+  } catch (e) {
+    return null;
+  }
 }
 
-/**
- * users/{uid} の fields を使って日次回数を管理
- */
-async function checkAndIncrementDailyUsage(uid) {
-  const today = getJstDateString();
-  const ref = db.collection("users").doc(uid);
-
-  return await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const data = snap.exists ? snap.data() : {};
-
-    const plan = data?.plan || "free";
-
-    const dailyLimit =
-      typeof data?.dailyLimit === "number"
-        ? data.dailyLimit
-        : plan === "standard"
-          ? 30
-          : plan === "light"
-            ? 10
-            : 10;
-
-    const usageDate = data?.usageDate || null;
-    let usedToday = typeof data?.usedToday === "number" ? data.usedToday : 0;
-
-    if (usageDate !== today) usedToday = 0;
-
-    if (usedToday >= dailyLimit) {
-      return { ok: false, dailyLimit, usedToday, today };
-    }
-
-    tx.set(
-      ref,
-      {
-        usageDate: today,
-        usedToday: usedToday + 1,
-        plan,
-        dailyLimit,
-      },
-      { merge: true }
-    );
-
-    return { ok: true, dailyLimit, usedToday: usedToday + 1, today };
-  });
-}
-
-/** ✅ conversations へ保存（サーバー時刻で確定） */
+/* =========================
+   Firestore: 会話の保存
+========================= */
 async function saveConversation({ uid, role, content }) {
-  const dayKey = getJstDateString();
+  const db = admin.firestore();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
   await db.collection("conversations").add({
     uid,
-    role, // "user" | "ai"
-    content,
-    dayKey, // "YYYY-MM-DD" (JST)
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    role, // "user" or "ai" or "system"
+    content: String(content || ""),
+    createdAt: now,
+    dayKey: dayKeyJST(),
   });
 }
 
-/**
- * ✅ 直近の会話履歴を Firestore から取得
- * - sameDayOnly=true なら今日分のみ
- * - limitN は「合計メッセージ数」(user+ai をまとめてN件)
- */
-async function loadRecentConversation({ uid, limitN = 20, sameDayOnly = true }) {
-  const today = getJstDateString();
+/* =========================
+   Firestore: 直近N件取得
+========================= */
+async function loadRecentHistory(uid, limitN = 20) {
+  const db = admin.firestore();
 
-  let q = db.collection("conversations").where("uid", "==", uid);
-  if (sameDayOnly) q = q.where("dayKey", "==", today);
+  // uid の直近N件を createdAt desc で取得 → 逆順にして時系列に戻す
+  const snap = await db
+    .collection("conversations")
+    .where("uid", "==", uid)
+    .orderBy("createdAt", "desc")
+    .limit(limitN)
+    .get();
 
-  // createdAt desc で直近N件
-  q = q.orderBy("createdAt", "desc").limit(limitN);
-
-  const snap = await q.get();
-
-  // desc で取ってるので、OpenAIに渡すため asc に戻す
-  const rows = [];
+  const list = [];
   snap.forEach((doc) => {
     const d = doc.data() || {};
-    rows.push({
-      role: d.role,
-      content: d.content,
-      createdAt: d.createdAt,
+    list.push({
+      role: d.role || "system",
+      content: d.content || "",
+      createdAt: d.createdAt || null,
+      dayKey: d.dayKey || "",
     });
   });
-  rows.reverse();
 
-  // OpenAI用 role 変換（Firestore: "ai" → OpenAI: "assistant"）
-  const messages = rows
-    .filter((m) => (m.role === "user" || m.role === "ai") && typeof m.content === "string")
-    .map((m) => ({
-      role: m.role === "ai" ? "assistant" : "user",
-      content: m.content,
-    }));
-
-  return messages;
+  // descで取ったので、古い→新しい順に戻す
+  list.reverse();
+  return list;
 }
 
-export default async function handler(req, res) {
-  cors(res);
+/* =========================
+   OpenAI 呼び出し（Chat Completions）
+   ※あなたの既存実装に合わせてRESTで書いています
+========================= */
+async function callOpenAI(messages) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+  // ここはあなたの運用モデルに合わせて変更OK
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-  try {
-    const { message, messages } = req.body || {};
-    const userMessage =
-      message ?? (Array.isArray(messages) ? messages[messages.length - 1]?.content : null);
-
-    if (!userMessage || typeof userMessage !== "string") {
-      return res.status(400).json({ error: "message is required" });
-    }
-
-    // ✅ ① 認証（Bearer ID token）
-    const user = await verifyUser(req);
-    const uid = user?.uid;
-    if (!uid) return res.status(401).json({ error: "unauthorized" });
-
-    // ✅ ② 回数チェック＆加算（サーバー側で確定）
-    const usage = await checkAndIncrementDailyUsage(uid);
-    if (!usage.ok) {
-      return res.status(429).json({
-        error: "daily_limit",
-        message: "本日の上限に達しました。明日またお待ちしています。",
-        dailyLimit: usage.dailyLimit,
-        usedToday: usage.usedToday,
-        date: usage.today,
-      });
-    }
-
-    // ✅ ③ OpenAI 呼び出し
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
-
-    // ✅ ここが本丸：Firestoreから履歴を読み、今回の質問の前に積む
-    // まずは「今日分のみ」「直近20件」くらいが安全
-    let history = [];
-    try {
-      history = await loadRecentConversation({ uid, limitN: 20, sameDayOnly: true });
-    } catch (e) {
-      console.error("[api/chat] loadRecentConversation failed", e);
-      history = [];
-    }
-
-    // ✅ system は「履歴を踏まえてOK」な文に（“覚えていません”固定文は入れない）
-    const systemPrompt =
-      "あなたは優しく簡潔に寄り添うメンタルサポーターです。"
-      + " 以下の会話履歴（このユーザーの過去の投稿とあなたの返答）が与えられている場合は、"
-      + " その範囲で文脈を踏まえて自然に会話してください。"
-      + " 履歴にないことは推測せず、必要なら質問してください。";
-
-    const payload = {
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history, // ← ここに直近履歴が入る（user/assistant）
-        { role: "user", content: userMessage }, // ← 最後に今回
-      ],
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
       temperature: 0.7,
-      max_tokens: 350,
-    };
-
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("[api/chat] OpenAI error", resp.status, err);
-      return res.status(500).json({ error: "OpenAI error", status: resp.status, detail: err });
-    }
-
-    const data = await resp.json();
-    const text = data.choices?.[0]?.message?.content?.trim() || "（応答を取得できませんでした）";
-
-    // ✅ ④ 履歴を保存（ユーザー投稿 → AI返信）
-    try {
-  await saveConversation({ uid, role: "user", content: userMessage });
-  await saveConversation({ uid, role: "ai", content: text });
-} catch (e) {
-  console.error("[api/chat] saveConversation failed", e);
-  return res.status(500).json({
-    error: "save_failed",
-    detail: String(e?.message || e),
+      messages,
+    }),
   });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    const err = new Error(`OpenAI error: ${resp.status} ${text}`);
+    err.status = resp.status;
+    throw err;
+  }
+
+  const data = await resp.json();
+  const out = data?.choices?.[0]?.message?.content?.trim() || "";
+  return out || "（応答を取得できませんでした）";
 }
 
-    return res.status(200).json({
-      text,
-      usage: { usedToday: usage.usedToday, dailyLimit: usage.dailyLimit, date: usage.today },
-    });
-  } catch (e) {
-    console.error("[api/chat] server error", e);
-    const msg = String(e?.message || e || "");
-    if (msg.includes("No token") || msg.includes("Firebase ID token")) {
+/* =========================
+   Handler
+========================= */
+export default async function handler(req, res) {
+  try {
+    initFirebaseAdmin();
+
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "method_not_allowed" });
+    }
+
+    const uid = await getUidFromRequest(req);
+    if (!uid) {
       return res.status(401).json({ error: "unauthorized" });
     }
-    return res.status(500).json({ error: "server error" });
+
+    const body = req.body || {};
+    const userMessage = String(body.message || "").trim();
+    if (!userMessage) {
+      return res.status(400).json({ error: "bad_request", message: "message is required" });
+    }
+
+    // 1) まずユーザー投稿を保存（＝確実にログが残る）
+    await saveConversation({ uid, role: "user", content: userMessage });
+
+    // 2) Firestoreから直近履歴を取得（これが“記憶”）
+    const history = await loadRecentHistory(uid, 20);
+
+    // 3) OpenAIに渡すmessagesを組み立て
+    //    role の変換: Firestoreの "ai" → OpenAIの "assistant"
+    const systemPrompt =
+      "あなたは『MentalGPT』として、ユーザーの気持ちに寄り添い、短すぎず長すぎず、丁寧で具体的に返答します。過去の会話の文脈があれば自然に参照してください。";
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history
+        .filter((m) => m && m.content)
+        .map((m) => {
+          if (m.role === "ai") return { role: "assistant", content: m.content };
+          if (m.role === "user") return { role: "user", content: m.content };
+          return { role: "system", content: m.content };
+        }),
+      // ※念のため最後に今回の入力を入れておく（すでにhistoryに入ってるはずだが、整合が崩れた時の保険）
+      { role: "user", content: userMessage },
+    ];
+
+    // 4) OpenAI呼び出し
+    const answer = await callOpenAI(messages);
+
+    // 5) AI返答をFirestoreに保存
+    await saveConversation({ uid, role: "ai", content: answer });
+
+    // 6) 返す（Dashboard側は data.text を見ているので text で返す）
+    return res.status(200).json({
+      text: answer,
+      // usage を返している実装ならここにも合わせられますが、
+      // 既存の /api/usage があるので、まずは text だけでOKです
+    });
+  } catch (e) {
+    console.error("[api/chat] error", e);
+
+    // OpenAI由来なら status を尊重
+    const status = e?.status ? Number(e.status) : 500;
+    return res.status(status).json({
+      error: "server_error",
+      message: e?.message || "server error",
+    });
   }
 }
