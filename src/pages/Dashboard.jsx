@@ -1,5 +1,5 @@
 // DEBUG_MARK: mentalgpt-main-20260215-001
-// // src/pages/Dashboard.jsx
+// src/pages/Dashboard.jsx
 import "../styles/Button.css";
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -16,8 +16,9 @@ const HINTS = [
 "少しだけお待ちください…",
 ];
 
-// ✅ デバッグ表示のON/OFF（通常運用は false 推奨）
-const SHOW_DEBUG = false;
+// ✅ 点検モード（通常運用は false 推奨）
+// まずは true にして「点検: 最新10件」ボタンが出るか確認してください
+const SHOW_DEBUG = true;
 
 function dayKeyJST(d = new Date()) {
 return new Intl.DateTimeFormat("en-CA", {
@@ -138,12 +139,48 @@ id: doc.id,
 role: d.role || "system",
 content: d.content || "",
 createdAt: d.createdAt || "",
+dayKey: d.dayKey || "",
 });
 });
 setMessages(list);
 setTimeout(() => scrollToBottom(false), 0);
 } catch (e) {
 console.error("[Dashboard] reloadTodayFromFirestore error", e);
+}
+}
+
+/* ===== 点検: 直近10件（このユーザーの最新10件） ===== */
+async function debugLoadLatestForUser(uid) {
+try {
+const ref = collection(db, "conversations");
+const q = query(ref, where("uid", "==", uid), orderBy("createdAt", "desc"), limit(10));
+const snap = await getDocs(q);
+
+const list = [];
+snap.forEach((doc) => {
+const d = doc.data() || {};
+list.push({
+id: doc.id,
+role: d.role || "system",
+content: d.content || "",
+createdAt: d.createdAt || "",
+dayKey: d.dayKey || "",
+});
+});
+
+console.log("[DEBUG] latest 10 for user", list);
+
+alert(
+list
+.map(
+(x) =>
+`${toJpDateTime(x.createdAt)} [${x.dayKey}] ${x.role}: ${String(x.content).slice(0, 30)}`
+)
+.join("\n")
+);
+} catch (e) {
+console.error("[DEBUG] debugLoadLatestForUser error", e);
+alert("点検モードでエラー（consoleを確認）");
 }
 }
 
@@ -258,6 +295,17 @@ margin: "8px 0 4px",
 }}
 >
 <h1 style={{ margin: 0 }}>投稿</h1>
+
+{/* ===== 点検ボタン（SHOW_DEBUG=true の時だけ表示） ===== */}
+{SHOW_DEBUG && userUid && (
+<button
+type="button"
+style={{ fontSize: 12, padding: "4px 8px" }}
+onClick={() => debugLoadLatestForUser(userUid)}
+>
+点検: 最新10件
+</button>
+)}
 
 <span style={{ fontSize: 13, color: "#666" }}>
 今日の利用回数：{todayCount} / {planLimit}（残り {remain}）
