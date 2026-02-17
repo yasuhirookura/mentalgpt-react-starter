@@ -1,10 +1,7 @@
 // api/chat.js
-// Firestoreに保存された会話履歴（直近N件）を読み込んでから OpenAI に送る版
+// Firestoreの会話履歴（直近N件）を読み込んで OpenAI に渡す版（修正版）
 
 import admin from "firebase-admin";
-
-// Node 18+ (Vercel) なら fetch が使えます
-// もし古い環境なら node-fetch が必要ですが、Vercelは通常OKです。
 
 /* =========================
    Firebase Admin 初期化
@@ -17,10 +14,12 @@ function initFirebaseAdmin() {
   let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Missing Firebase Admin env vars (FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)");
+    throw new Error(
+      "Missing Firebase Admin env vars (FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)"
+    );
   }
 
-  // Vercelの環境変数で改行が \n になるケース対策
+  // Vercelの環境変数で改行が \\n になるケース対策
   privateKey = privateKey.replace(/\\n/g, "\n");
 
   admin.initializeApp({
@@ -33,13 +32,12 @@ function initFirebaseAdmin() {
 }
 
 function dayKeyJST(d = new Date()) {
-  // YYYY-MM-DD (Asia/Tokyo)
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(d);
+  }).format(d); // YYYY-MM-DD
 }
 
 /* =========================
@@ -54,7 +52,7 @@ async function getUidFromRequest(req) {
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     return decoded?.uid || null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -81,7 +79,6 @@ async function saveConversation({ uid, role, content }) {
 async function loadRecentHistory(uid, limitN = 20) {
   const db = admin.firestore();
 
-  // uid の直近N件を createdAt desc で取得 → 逆順にして時系列に戻す
   const snap = await db
     .collection("conversations")
     .where("uid", "==", uid)
@@ -100,20 +97,18 @@ async function loadRecentHistory(uid, limitN = 20) {
     });
   });
 
-  // descで取ったので、古い→新しい順に戻す
+  // 古い→新しい順に
   list.reverse();
   return list;
 }
 
 /* =========================
    OpenAI 呼び出し（Chat Completions）
-   ※あなたの既存実装に合わせてRESTで書いています
 ========================= */
 async function callOpenAI(messages) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
-  // ここはあなたの運用モデルに合わせて変更OK
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -137,8 +132,7 @@ async function callOpenAI(messages) {
   }
 
   const data = await resp.json();
-  const out = data?.choices?.[0]?.message?.content?.trim() || "";
-  return out || "（応答を取得できませんでした）";
+  return data?.choices?.[0]?.message?.content?.trim() || "（応答を取得できませんでした）";
 }
 
 /* =========================
@@ -163,28 +157,37 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "bad_request", message: "message is required" });
     }
 
-    // 1) まずユーザー投稿を保存（＝確実にログが残る）
-    await saveConversation({ uid, role: "user", content: userMessage });
-
-    // 2) Firestoreから直近履歴を取得（これが“記憶”）
+    // 1) まず “直近履歴” を読む（今回の投稿はまだ混ぜない）
     const history = await loadRecentHistory(uid, 20);
+
+    // 2) 今回のユーザー投稿を保存（ログは確実に残す）
+    await saveConversation({ uid, role: "user", content: userMessage });
 
     // 3) OpenAIに渡すmessagesを組み立て
     //    role の変換: Firestoreの "ai" → OpenAIの "assistant"
-    const systemPrompt =
-      "あなたは『MentalGPT』として、ユーザーの気持ちに寄り添い、短すぎず長すぎず、丁寧で具体的に返答します。過去の会話の文脈があれば自然に参照してください。";
+    const systemPrompt = `
+あなたは『MentalGPT』として振る舞います。
+ユーザーの気持ちに寄り添い、丁寧で具体的に返答してください。
+
+重要:
+- あなたには「このリクエスト内に渡された会話履歴」があります。履歴がある場合は必ず参照してください。
+- ユーザーが「直前の内容を覚えていますか？」等と尋ねた場合、履歴から直前の内容を短く要約して答えてください。
+- 履歴が渡されているのに「覚えていません」「記憶できません」などの定型文で逃げないでください。
+- ただし、履歴に存在しないことは推測せず、必要なら確認質問をしてください。
+`.trim();
+
+    const mappedHistory = history
+      .filter((m) => m && m.content)
+      .map((m) => {
+        if (m.role === "ai" || m.role === "assistant") return { role: "assistant", content: m.content };
+        if (m.role === "user") return { role: "user", content: m.content };
+        return { role: "system", content: m.content };
+      });
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...history
-        .filter((m) => m && m.content)
-        .map((m) => {
-          if (m.role === "ai") return { role: "assistant", content: m.content };
-          if (m.role === "user") return { role: "user", content: m.content };
-          return { role: "system", content: m.content };
-        }),
-      // ※念のため最後に今回の入力を入れておく（すでにhistoryに入ってるはずだが、整合が崩れた時の保険）
-      { role: "user", content: userMessage },
+      ...mappedHistory,
+      { role: "user", content: userMessage }, // ★今回の入力は1回だけ
     ];
 
     // 4) OpenAI呼び出し
@@ -193,16 +196,10 @@ export default async function handler(req, res) {
     // 5) AI返答をFirestoreに保存
     await saveConversation({ uid, role: "ai", content: answer });
 
-    // 6) 返す（Dashboard側は data.text を見ているので text で返す）
-    return res.status(200).json({
-      text: answer,
-      // usage を返している実装ならここにも合わせられますが、
-      // 既存の /api/usage があるので、まずは text だけでOKです
-    });
+    // 6) 返す（Dashboard側は data.text を見ているので text）
+    return res.status(200).json({ text: answer });
   } catch (e) {
     console.error("[api/chat] error", e);
-
-    // OpenAI由来なら status を尊重
     const status = e?.status ? Number(e.status) : 500;
     return res.status(status).json({
       error: "server_error",
