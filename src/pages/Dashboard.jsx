@@ -53,6 +53,9 @@ const [planLimit, setPlanLimit] = useState(10);
 const [userUid, setUserUid] = useState("");
 const [userEmail, setUserEmail] = useState("");
 
+// ✅ 返信完了フラッシュ
+const [flash, setFlash] = useState("");
+
 const endRef = useRef(null);
 
 useEffect(() => {
@@ -94,6 +97,13 @@ if (unsub) unsub();
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
+
+// ✅ flash 自動消去
+useEffect(() => {
+if (!flash) return;
+const t = setTimeout(() => setFlash(""), 2000);
+return () => clearTimeout(t);
+}, [flash]);
 
 async function refreshUsage() {
 try {
@@ -201,13 +211,23 @@ setText("");
 localStorage.setItem("draft", "");
 
 // UIは即反映（ただし最終はFirestoreから読み直す）
-const optimistic = {
+const optimisticUser = {
 id: `tmp_user_${Date.now()}`,
 role: "user",
 content: body,
 createdAt: new Date(),
 };
-setMessages((prev) => [...prev, optimistic]);
+
+// ✅ 「回答中…」の吹き出し（これが“終わったか分からない”を解決）
+const optimisticAi = {
+id: `tmp_ai_${Date.now()}`,
+role: "ai",
+content: "…（回答中）",
+createdAt: new Date(),
+_pending: true,
+};
+
+setMessages((prev) => [...prev, optimisticUser, optimisticAi]);
 setTimeout(() => scrollToBottom(false), 0);
 
 try {
@@ -229,9 +249,7 @@ const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 const msg =
 data?.message ||
-(data?.error === "daily_limit"
-? "本日の上限に達しました。"
-: `送信に失敗しました（${res.status}）`);
+(data?.error === "daily_limit" ? "本日の上限に達しました。" : `送信に失敗しました（${res.status}）`);
 throw new Error(msg);
 }
 
@@ -247,21 +265,28 @@ await refreshUsage();
 if (u?.uid) {
 await reloadTodayFromFirestore(u.uid);
 } else {
-// いちおう画面だけ追加
+// いちおう画面だけ置換（pendingを消して、返答を入れる）
+setMessages((prev) => {
+const withoutPending = prev.filter((m) => !m?._pending);
 const aiMsg = {
-id: `tmp_ai_${Date.now()}`,
+id: `tmp_ai_done_${Date.now()}`,
 role: "ai",
 content: data.text ?? data.content ?? "(応答なし)",
 createdAt: new Date(),
 };
-setMessages((prev) => [...prev, aiMsg]);
+return [...withoutPending, aiMsg];
+});
 }
 
+// ✅ 返信完了フラッシュ（ここが“完了した合図”）
+setFlash("✅ 返信しました");
 setTimeout(() => scrollToBottom(), 0);
 } catch (e) {
 console.error("[send] error", e);
+
+// pending吹き出しを消して、エラーを出す
 setMessages((prev) => [
-...prev,
+...prev.filter((m) => !m?._pending),
 {
 id: `err_${Date.now()}`,
 role: "system",
@@ -283,6 +308,7 @@ el.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
 
 const over = text.length > MAX;
 const remain = Math.max(planLimit - todayCount, 0);
+const hasChat = messages.length > 0;
 
 return (
 <main className="container" style={{ maxWidth: 820, marginTop: 0, paddingTop: 0 }}>
@@ -317,14 +343,28 @@ onClick={() => debugLoadLatestForUser(userUid)}
 </span>
 </header>
 
+{/* ✅ 返信完了フラッシュ */}
+{flash && (
+<div
+style={{
+fontSize: 12,
+color: "#0a6cff",
+margin: "4px 0 8px",
+}}
+>
+{flash}
+</div>
+)}
+
 {/* 会話（今日の履歴） */}
 <div
 style={{
 border: "1px solid #e5e7eb",
 borderRadius: 12,
 padding: "12px",
-minHeight: "52vh",
-maxHeight: "72vh",
+// ✅ 相談が始まったら会話エリアを広げる
+minHeight: hasChat ? "64vh" : "52vh",
+maxHeight: hasChat ? "78vh" : "72vh",
 overflowY: "auto",
 background: "#fff",
 display: "flex",
@@ -390,11 +430,16 @@ className="sendButton"
 </button>
 </div>
 
+{/* ✅ カウンタ＆ヒントを“下段にまとめて”視線移動を減らす */}
 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
 <span style={{ fontSize: 12, color: over ? "#c00" : "#666" }}>
 {Math.min(text.length, MAX)} / {MAX}
 </span>
-{isLoading && <span style={{ fontSize: 12, color: "#0a6cff", marginLeft: 8 }}>{hint}</span>}
+{isLoading && (
+<span style={{ fontSize: 12, color: "#0a6cff", marginLeft: 8 }}>
+{hint}
+</span>
+)}
 </div>
 </div>
 </main>
