@@ -220,11 +220,11 @@ createdAt: new Date(),
 
 // ✅ 「回答中…」の吹き出し（これが“終わったか分からない”を解決）
 const optimisticAi = {
-id: `tmp_ai_${Date.now()}`,
-role: "ai",
-content: "…（回答中）",
-createdAt: new Date(),
-_pending: true,
+  id: `tmp_ai_${Date.now()}`,
+  role: "ai",
+  content: "",
+  createdAt: new Date(),
+  _pending: true,
 };
 
 setMessages((prev) => [...prev, optimisticUser, optimisticAi]);
@@ -448,26 +448,39 @@ className="sendButton"
 
 /* ------ バブル ------ */
 function MessageBubble({ role, content, createdAt }) {
-const isUser = role === "user";
-return (
-<div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
-<div
-style={{
-background: role === "ai" ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
-border: "1px solid #e5e7eb",
-padding: "10px 12px",
-borderRadius: 12,
-maxWidth: "85%",
-lineHeight: 1.8,
-whiteSpace: "pre-wrap",
-wordBreak: "break-word",
-}}
->
-<div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-{isUser ? "あなた" : role === "ai" ? "MentalGPT" : "システム"} ・ {toJpDateTime(createdAt)}
-</div>
-<div>{content}</div>
-</div>
-</div>
-);
+  const isUser = role === "user";
+  const isAi = role === "ai";
+  const isPending = isAi && (!content || String(content).trim() === "…（回答中）");
+
+  return (
+    <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "8px 0" }}>
+      <div
+        style={{
+          background: isAi ? "#f6f6f6" : isUser ? "#e7f1ff" : "#fff6e6",
+          border: "1px solid #e5e7eb",
+          padding: "10px 12px",
+          borderRadius: 12,
+          maxWidth: "85%",
+          lineHeight: 1.8,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+          {isUser ? "あなた" : isAi ? "MentalGPT" : "システム"} ・ {toJpDateTime(createdAt)}
+        </div>
+
+        {/* ✅ ここが「丸い点滅」 */}
+        {isPending ? (
+          <div className="typingDots" aria-label="回答中">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : (
+          <div>{content}</div>
+        )}
+      </div>
+    </div>
+  );
 }
