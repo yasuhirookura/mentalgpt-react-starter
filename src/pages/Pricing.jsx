@@ -146,7 +146,10 @@ export default function Pricing() {
       </section>
 
       <p style={{ fontSize: 13, color: "#666", marginTop: 20, textAlign: "center" }}>
-        ※申込みを途中でキャンセルしたら、プランは未契約です。
+        ※7日間の無料体験があります。<br />
+        ※無料期間中に解約すれば料金は発生しません。<br />
+        ※無料期間終了後は、月額500円 / 980円で自動更新されます。<br />
+        ※いつでも解約できます。
       </p>
     </main>
   );
