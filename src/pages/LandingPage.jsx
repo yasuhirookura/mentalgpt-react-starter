@@ -96,6 +96,28 @@ export default function LandingPage() {
           </Link>
         </div>
 
+        <p style={{ fontSize: "12px", color: "#666", marginTop: "10px" }}>
+  はじめての方はこちら
+</p>
+
+        <div style={{ marginTop: "12px", textAlign: "center" }}>
+  <a
+    href="https://okulab.com/mentalgpt-guide/"
+    style={{
+      display: "inline-block",
+      padding: "10px 16px",
+      border: "2px solid #29a7e8",
+      borderRadius: "10px",
+      color: "#29a7e8",
+      fontWeight: "bold",
+      textDecoration: "none",
+      fontSize: "14px"
+    }}
+  >
+    MentalGPTについて詳しく
+  </a>
+</div>
+
         {/* ---------------- Voice Balloon ---------------- */}
         <div
           style={{
