@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MentalGPTとは | MentalGPT</title>
+  <meta name="description" content="MentalGPTの説明ページです。どんなときに使えるか、どんな人に向いているか、料金や注意点をわかりやすく紹介します。" />
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #14213d;
+      --sub: #4b5563;
+      --line: #dbe3ef;
+      --blue: #29a7e8;
+      --blue-dark: #178fcb;
+      --yellow: #ffe83b;
+      --soft: #eef7ff;
+      --soft-green: #f3fbef;
+      --danger-soft: #fff7f7;
+      --max: 860px;
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    .wrap {
+      width: min(calc(100% - 28px), var(--max));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      padding: 18px 0 8px;
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .top-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .mini-btn {
+      border: 1.5px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 0.94rem;
+      font-weight: 700;
+    }
+
+    .hero {
+      padding: 18px 0 22px;
+    }
+
+    .hero-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      padding: 28px 20px 24px;
+      box-shadow: 0 10px 30px rgba(20, 33, 61, 0.05);
+    }
+
+    .beta {
+      display: inline-block;
+      margin-bottom: 14px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: #eaf2ff;
+      color: #2d6cdf;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 7vw, 4rem);
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-copy {
+      margin: 0;
+      font-size: clamp(1.3rem, 5vw, 2.1rem);
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .lead {
+      margin-top: 18px;
+      color: var(--sub);
+      font-size: 1.04rem;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      padding: 0 20px;
+      border-radius: 16px;
+      font-weight: 800;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(41, 167, 232, 0.22);
+    }
+
+    .btn-primary:hover {
+      background: var(--blue-dark);
+    }
+
+    .btn-secondary {
+      border: 2px solid #86c7ea;
+      background: #fff;
+      color: var(--blue-dark);
+    }
+
+    .hero-note {
+      margin-top: 14px;
+      font-size: 0.95rem;
+      color: var(--sub);
+    }
+
+    .section {
+      padding: 16px 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px 18px;
+      box-shadow: 0 6px 20px rgba(20, 33, 61, 0.04);
+    }
+
+    .card.soft {
+      background: var(--soft);
+    }
+
+    .card.green {
+      background: var(--soft-green);
+    }
+
+    .card.warn {
+      background: var(--danger-soft);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: clamp(1.45rem, 5vw, 2rem);
+      line-height: 1.35;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 1.14rem;
+      line-height: 1.45;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    .muted {
+      color: var(--sub);
+    }
+
+    .check-list,
+    .plain-list {
+      list-style: none;
+      padding: 0;
+      margin: 14px 0 0;
+    }
+
+    .check-list li,
+    .plain-list li {
+      padding-left: 1.7em;
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .check-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-weight: 900;
+    }
+
+    .plain-list li::before {
+      content: "・";
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-weight: 900;
+    }
+
+    .step-list {
+      counter-reset: step;
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .step {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px 16px 16px 54px;
+      position: relative;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    .quote-box {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 16px;
+      margin-top: 14px;
+    }
+
+    .chat-sample {
+      margin-top: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .bubble {
+      max-width: 90%;
+      padding: 13px 15px;
+      border-radius: 18px;
+      font-size: 0.98rem;
+      line-height: 1.75;
+    }
+
+    .bubble.user {
+      justify-self: end;
+      background: #dff4ff;
+      border-bottom-right-radius: 6px;
+    }
+
+    .bubble.ai {
+      justify-self: start;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-bottom-left-radius: 6px;
+    }
+
+    .price-box {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .price-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 16px;
+    }
+
+    .price-name {
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .price-value {
+      font-size: 1.45rem;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .faq {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    details {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 800;
+      list-style: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .summary-text {
+      color: var(--sub);
+      margin-top: 10px;
+    }
+
+    .final-cta {
+      padding: 20px 0 40px;
+    }
+
+    .final-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f4fbff 100%);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      padding: 28px 20px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(20, 33, 61, 0.05);
+    }
+
+    .final-card p {
+      max-width: 620px;
+      margin: 0 auto 14px;
+    }
+
+    footer {
+      padding: 6px 0 40px;
+      color: var(--sub);
+      font-size: 0.92rem;
+    }
+
+    .footer-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 20px 16px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      margin-bottom: 14px;
+      font-weight: 700;
+    }
+
+    .small {
+      font-size: 0.92rem;
+      color: var(--sub);
+    }
+
+    @media (min-width: 760px) {
+      .hero-card {
+        padding: 42px 34px 34px;
+      }
+
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .card {
+        padding: 26px 24px;
+      }
+
+      .final-card {
+        padding: 40px 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a href="index.html" class="brand">MentalGPT</a>
+      <nav class="top-links">
+        <a class="mini-btn" href="index.html">トップへ戻る</a>
+        <a class="mini-btn" href="#price">料金</a>
+        <a class="mini-btn" href="#faq">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-card">
+          <div class="beta">β版</div>
+          <h1>MentalGPTとは</h1>
+          <p class="hero-copy">
+            未来が見えなくて、不安なときに。<br />
+            無理に前向きにならなくて大丈夫です。
+          </p>
+          <p class="lead">
+            MentalGPTは、気持ちや考えを言葉にしながら、心を少し整理するためのAIメンタルサポートです。<br />
+            24時間いつでも使えて、やさしい応答と小さな次の一歩の提案を通じて、今日を少し進めるお手伝いをします。
+          </p>
+
+          <div class="cta-row">
+            <a href="signup.html" class="btn-primary">1週間無料で試してみる</a>
+            <a href="index.html" class="btn-secondary">トップページへ戻る</a>
+          </div>
+
+          <p class="hero-note">
+            ※本サービスは医療行為ではありません。診断・治療を行うものではなく、必要に応じて専門家への相談をおすすめします。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap grid-2">
+        <div class="card">
+          <h2>こんなときに</h2>
+          <ul class="plain-list">
+            <li>なんとなく不安が消えない</li>
+            <li>将来のことを考えると気持ちが重くなる</li>
+            <li>誰かに話したいけれど、うまく話せない</li>
+            <li>頭の中が散らかって、整理できない</li>
+            <li>夜になると気持ちが沈みやすい</li>
+            <li>いまは大きな悩みではないけれど、少し気持ちを軽くしたい</li>
+          </ul>
+        </div>
+
+        <div class="card soft">
+          <h2>こんな人に向いています</h2>
+          <ul class="check-list">
+            <li>気持ちを言葉にして整理したい人</li>
+            <li>やさしく受け止めてもらいたい人</li>
+            <li>いきなり重い相談でなく、まず少し話してみたい人</li>
+            <li>深夜や早朝など、時間を気にせず使いたい人</li>
+            <li>「次に何をしたらいいか」を少しだけ見つけたい人</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class=
